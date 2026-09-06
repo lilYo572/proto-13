@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Brad Bitt — diagnostic audio</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 28px 22px 60px;
+    background: #0f1119; color: #e6e8f0;
+    font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .boite { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 21px; margin: 0 0 4px; color: #e8b62c; }
+  p.sous { margin: 0 0 24px; color: rgba(255,255,255,.5); font-size: 13px; }
+  h2 { font-size: 14px; margin: 28px 0 10px; color: #e8b62c;
+       border-bottom: 1px solid rgba(232,182,44,.25); padding-bottom: 5px; }
+  #verdict {
+    padding: 14px 16px; border-radius: 8px; margin: 18px 0 4px;
+    border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.04);
+    font-size: 15px; line-height: 1.5;
+  }
+  #verdict.bon  { border-color: rgba(126,224,138,.6); background: rgba(126,224,138,.1); }
+  #verdict.mauvais { border-color: rgba(226,85,59,.6); background: rgba(226,85,59,.1); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { text-align: left; padding: 4px 10px 4px 0; vertical-align: top; }
+  th { color: rgba(255,255,255,.45); font-weight: 500; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+  .ok   { color: #7ee08a; }
+  .ko   { color: #e2553b; }
+  .gris { color: rgba(255,255,255,.4); }
+  button {
+    font: inherit; padding: 9px 18px; border-radius: 7px; cursor: pointer;
+    border: 1px solid #e8b62c; background: rgba(232,182,44,.16); color: #ffe9a8;
+  }
+  button:hover { background: rgba(232,182,44,.3); }
+  #copier { margin-left: 8px; border-color: rgba(255,255,255,.25);
+            background: rgba(255,255,255,.06); color: #e6e8f0; }
+  #zone-copie { width: 100%; height: 150px; margin-top: 10px; display: none;
+    background: #080a10; color: #b9c0d0; border: 1px solid rgba(255,255,255,.15);
+    border-radius: 6px; padding: 10px; font-family: ui-monospace, monospace;
+    font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="boite">
+
+<h1>Diagnostic audio — Brad Bitt</h1>
+<p class="sous">
+  Cette page se place à côté de <code>index.html</code> et teste exactement ce
+  que le jeu teste, dans le même navigateur, depuis le même dossier. Elle ne
+  modifie rien.
+</p>
+
+<div id="verdict">Analyse en cours…</div>
+
+<p style="margin-top:18px">
+  <button id="lancer">Tester la lecture du son</button>
+  <button id="copier">Copier le rapport</button>
+</p>
+<textarea id="zone-copie" readonly></textarea>
+
+<h2>1. Ce que le navigateur dit savoir lire</h2>
+<table id="formats"></table>
+
+<h2>2. Les fichiers du dossier assets/audio</h2>
+<table id="fichiers"><tr><td class="gris">Chargement…</td></tr></table>
+
+<h2>3. Les réglages enregistrés dans ce navigateur</h2>
+<table id="reglages"></table>
+
+<h2>4. Le navigateur</h2>
+<table id="navigateur"></table>
+
+</div>
+
+<script>
+'use strict';
+
+/* Les mêmes pistes que le jeu, dans le même ordre de priorité. */
+/* Les NOMS DE FICHIER, tout en minuscules — pas les clefs du jukebox, qui ont
+   garde leur casse d'origine pour ne pas invalider les sauvegardes. */
+const PISTES = ['intro', 'niveau1', 'niveau2', 'niveau3',
+                'menu', 'menu-chill', 'menu-techno',
+                'menu-3irl', 'menu-core', 'menu-n2s3',
+                'boss3', 'boss6', 'boss9'];
+
+const rapport = [];
+function noter(l) { rapport.push(l); }
+
+function ligne(table, cle, valeur, classe) {
+  const tr = document.createElement('tr');
+  const th = document.createElement('th'); th.textContent = cle;
+  const td = document.createElement('td'); td.textContent = valeur;
+  if (classe) td.className = classe;
+  tr.appendChild(th); tr.appendChild(td);
+  document.getElementById(table).appendChild(tr);
+  noter(cle + ' : ' + valeur);
+}
+
+/* --- 1. Formats annoncés ------------------------------------------------ */
+const sonde = new Audio();
+const avisAac = sonde.canPlayType('audio/mp4; codecs="mp4a.40.2"');
+const avisMp3 = sonde.canPlayType('audio/mpeg');
+/* C'est exactement la règle de js/monde.js. */
+const EXT = (avisAac === 'probably' || avisAac === 'maybe') ? '.m4a' : '.mp3';
+
+ligne('formats', 'AAC / .m4a', avisAac === '' ? 'non (chaîne vide)' : avisAac,
+      avisAac ? 'ok' : 'ko');
+ligne('formats', 'MP3 / .mp3', avisMp3 === '' ? 'non (chaîne vide)' : avisMp3,
+      avisMp3 ? 'ok' : 'ko');
+ligne('formats', 'Format que le jeu demandera', EXT);
+
+/* --- 3. Réglages enregistrés -------------------------------------------- */
+let reglagesLus = null;
+try {
+  reglagesLus = JSON.parse(localStorage.getItem('bradbitt.feel.v1') || 'null');
+} catch (e) { /* navigation privée */ }
+
+const volMusique = reglagesLus && typeof reglagesLus.volMusique === 'number'
+  ? reglagesLus.volMusique : 0.55;
+const volEffets = reglagesLus && typeof reglagesLus.volEffets === 'number'
+  ? reglagesLus.volEffets : 0.6;
+
+ligne('reglages', 'Réglages trouvés', reglagesLus ? 'oui' : 'non (valeurs par défaut)');
+ligne('reglages', 'Volume de la musique',
+      Math.round(volMusique * 100) + ' %', volMusique <= 0.001 ? 'ko' : 'ok');
+ligne('reglages', 'Volume des effets',
+      Math.round(volEffets * 100) + ' %', volEffets <= 0.001 ? 'ko' : 'ok');
+
+/* --- 4. Navigateur ------------------------------------------------------ */
+ligne('navigateur', 'Adresse de la page', location.protocol + '//' +
+      (location.host || '(fichier local)'));
+ligne('navigateur', 'Identité', navigator.userAgent);
+
+/* --- 2. Test réel de chaque fichier ------------------------------------- */
+/* On ne peut pas utiliser fetch() : il est bloqué en file://. Un élément
+   <audio>, lui, charge parfaitement un fichier local — c'est d'ailleurs ce que
+   fait le jeu. */
+function tester(src) {
+  return new Promise(resoudre => {
+    const el = new Audio();
+    let fini = false;
+    const rendre = etat => { if (!fini) { fini = true; resoudre(etat); } };
+    el.addEventListener('loadeddata', () => rendre('ok'), { once: true });
+    el.addEventListener('canplaythrough', () => rendre('ok'), { once: true });
+    el.addEventListener('error', () => rendre('absent ou illisible'), { once: true });
+    setTimeout(() => rendre(el.readyState >= 1 ? 'ok' : 'délai dépassé'), 8000);
+    el.preload = 'auto';
+    el.src = src;
+    el.load();
+  });
+}
+
+let bonPrefere = 0, bonAutre = 0, aucun = [];
+
+(async () => {
+  const table = document.getElementById('fichiers');
+  table.innerHTML = '';
+  const entete = document.createElement('tr');
+  entete.innerHTML = '<th>Piste</th><th>.m4a</th><th>.mp3</th>';
+  table.appendChild(entete);
+
+  for (const nom of PISTES) {
+    const m4a = await tester('assets/audio/' + nom + '.m4a');
+    const mp3 = await tester('assets/audio/' + nom + '.mp3');
+    const tr = document.createElement('tr');
+    const c = e => e === 'ok' ? 'ok' : 'ko';
+    tr.innerHTML = '<th>' + nom + '</th>' +
+                   '<td class="' + c(m4a) + '">' + m4a + '</td>' +
+                   '<td class="' + c(mp3) + '">' + mp3 + '</td>';
+    table.appendChild(tr);
+    noter('  ' + nom + ' : m4a=' + m4a + ' mp3=' + mp3);
+
+    const prefere = EXT === '.m4a' ? m4a : mp3;
+    const autre   = EXT === '.m4a' ? mp3 : m4a;
+    if (prefere === 'ok') bonPrefere++;
+    else if (autre === 'ok') bonAutre++;
+    else aucun.push(nom);
+  }
+  conclure();
+})();
+
+function conclure() {
+  const v = document.getElementById('verdict');
+  let texte, classe;
+
+  if (volMusique <= 0.001) {
+    classe = 'mauvais';
+    texte = 'VOILÀ LA CAUSE : le volume de la musique est réglé à 0 % dans ce ' +
+            'navigateur. Les fichiers sont bons, le jeu les joue — mais à zéro. ' +
+            'Ouvre le jeu, va dans Options, et remonte « Volume de la musique ». ' +
+            'Le réglage est mémorisé par navigateur, ce qui explique qu\'il ait ' +
+            'survécu à toutes les versions.';
+  } else if (aucun.length === PISTES.length) {
+    classe = 'mauvais';
+    texte = 'AUCUN fichier audio n\'est lisible depuis cette page. Le dossier ' +
+            'assets/audio est probablement absent à côté de index.html, ou la ' +
+            'page est ouverte depuis un autre endroit que le dossier du jeu.';
+  } else if (aucun.length > 0) {
+    classe = 'mauvais';
+    texte = aucun.length + ' piste(s) illisibles dans les deux formats : ' +
+            aucun.join(', ') + '. Les autres fonctionnent.';
+  } else if (bonPrefere === 0) {
+    classe = '';
+    texte = 'Le format préféré (' + EXT + ') ne se charge pas, mais l\'autre ' +
+            'format fonctionne pour toutes les pistes. Le jeu bascule ' +
+            'automatiquement dessus : tu dois entendre la musique.';
+  } else {
+    classe = 'bon';
+    texte = 'Tout est en ordre : le navigateur lit le format demandé, les ' +
+            PISTES.length + ' pistes se chargent, et le volume n\'est pas à zéro. ' +
+            'Si tu n\'entends toujours rien, clique sur « Tester la lecture du ' +
+            'son » ci-dessus — le navigateur bloque peut-être la lecture ' +
+            'automatique.';
+  }
+  v.className = classe;
+  v.textContent = texte;
+  noter('');
+  noter('VERDICT : ' + texte);
+}
+
+/* --- Test de lecture, sur un vrai clic ---------------------------------- */
+document.getElementById('lancer').addEventListener('click', async () => {
+  const v = document.getElementById('verdict');
+  const src = 'assets/audio/menu' + EXT;
+  const el = new Audio();
+  el.src = src;
+  el.volume = 1;
+  try {
+    await el.play();
+    v.className = 'bon';
+    v.textContent = 'La lecture fonctionne : tu devrais entendre le thème de la ' +
+                    'base. Si tu l\'entends ici mais pas dans le jeu, le volume ' +
+                    'de la musique du jeu est en cause (Options).';
+    noter('Test de lecture : OK');
+    setTimeout(() => { el.pause(); }, 6000);
+  } catch (err) {
+    v.className = 'mauvais';
+    v.textContent = 'Le navigateur a REFUSÉ de lancer la lecture : ' + err.name +
+                    ' — ' + err.message;
+    noter('Test de lecture : REFUS ' + err.name);
+  }
+});
+
+document.getElementById('copier').addEventListener('click', () => {
+  const z = document.getElementById('zone-copie');
+  z.style.display = 'block';
+  z.value = rapport.join('\n');
+  z.select();
+  try { document.execCommand('copy'); } catch (e) { /* selection manuelle */ }
+});
+</script>
+</body>
+</html>
