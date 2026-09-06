@@ -178,7 +178,12 @@ addEventListener('keydown', e => {
         indexBoutique = (indexBoutique + 1) % articlesBoutique().length;
         audio.bruit('menu');
       } else if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || lettre === 'q' || lettre === 'd') {
-        ongletBoutique = 1 - ongletBoutique; indexBoutique = 0; audio.bruit('menu');
+        /* La boutique a deux ou trois onglets selon que les Secrets sont
+           decouverts : la bascule ne peut plus etre un simple « 1 moins ». */
+        const n = ongletsBoutique().length;
+        const pas = (e.code === 'ArrowLeft' || lettre === 'q') ? -1 : 1;
+        ongletBoutique = ((ongletBoutique + pas) % n + n) % n;
+        indexBoutique = 0; audio.bruit('menu');
       } else if (valider) acheterArticleCourant();
       return;
 

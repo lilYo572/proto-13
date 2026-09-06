@@ -88,6 +88,32 @@
     <button id="aller-menu">Menu principal</button>
   </section>
 
+  <!-- Téléportation : outil de test, pour ne pas retraverser un niveau entier
+       chaque fois qu'on veut vérifier ce qui se passe à la fin. -->
+  <div class="groupe-titre">Téléportation</div>
+  <section class="actions">
+    <select id="tp-niveau"></select>
+    <select id="tp-ou">
+      <option value="debut">Début</option>
+      <option value="quart">Premier quart</option>
+      <option value="milieu">Milieu</option>
+      <option value="arene">Arène du boss</option>
+      <option value="porte">Devant la porte</option>
+    </select>
+  </section>
+  <section class="actions">
+    <button id="tp-aller">Téléporter</button>
+    <button id="tp-hub">Aller à la base</button>
+  </section>
+  <section class="actions">
+    <button id="tp-bc">+100 BC</button>
+    <button id="tp-bcs">+1 BC secret</button>
+    <button id="tp-soin">Vie au maximum</button>
+  </section>
+  <p class="aide" id="tp-note">
+    Débloque aussi les niveaux précédents, pour que la carte reste cohérente.
+  </p>
+
   <section class="bascules">
     <label><input type="checkbox" id="opt-double-saut"> Double saut (débloquable plus tard)</label>
     <label><input type="checkbox" id="opt-saut-ennemi"> Les coureurs franchissent les trous</label>

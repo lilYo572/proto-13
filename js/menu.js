@@ -558,9 +558,10 @@ function rentrerALaBase() {
   audio.arreterMusique(0.5);
   entrerHub(premiere);
   if (premiere) return;
-  // Rapporter une piece de l'appareil prime sur le commentaire de mission :
-  // c'est la seule chose qui fasse avancer l'histoire.
-  braddyDit(prendreRepliqueObjet() || repliqueRetourNiveau());
+  /* Ordre de priorite des commentaires du retour. Une piece de l'appareil fait
+     avancer l'histoire, un Brad Coin secret ouvre une porte : les deux valent
+     mieux qu'une phrase de mission tiree au hasard. */
+  braddyDit(prendreRepliqueObjet() || prendreRepliqueSecret() || repliqueRetourNiveau());
 }
 
 function retourAuMenu() {

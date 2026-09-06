@@ -744,16 +744,55 @@ function repondreConfirmation(accepte) {
 let ongletBoutique = 0;          // 0 = basiques, 1 = permanents
 let indexBoutique = 0;
 
+/* Les onglets de la boutique. Le troisieme n'existe que si le joueur a deja
+   trouve un Brad Coin secret : avant, il n'y a rien a y faire, et un onglet
+   vide serait une promesse qu'on ne peut pas tenir. */
+/* Coupe un texte a une largeur donnee, en ajoutant des points de suspension.
+   La police doit deja etre posee sur le contexte quand on l'appelle. */
+function tronquer(texte, largeur) {
+  if (ctx.measureText(texte).width <= largeur) return texte;
+  let t = texte;
+  while (t.length > 1 && ctx.measureText(t + '…').width > largeur) t = t.slice(0, -1);
+  return t + '…';
+}
+
+/* Place disponible pour la ligne de detail d'un article.
+
+   Les ameliorations basiques partagent leur rangee avec l'etat courant
+   (« actuel : 20 % de blocage · +5 BC au suivant »), aligne a droite : il ne
+   reste alors qu'un tiers de la largeur. Les bonus permanents et les secrets
+   n'ont pas cette colonne et disposent de toute la rangee. */
+function largeurDetail(basique) { return basique ? 178 : 380; }
+
+function ongletsBoutique() {
+  const noms = ['Améliorations', 'Bonus permanents'];
+  if (partie.secretsVus) noms.push('Secrets');
+  return noms;
+}
+
 function articlesBoutique() {
+  if (ongletBoutique === 2 && partie.secretsVus) return SECRETS;
   return ongletBoutique === 0 ? AMELIORATIONS : PERMANENTS;
 }
 
 function dessinerBoutique() {
   cadrePanneau('BOUTIQUE', 'Le BRADDY3000 vous écoute. Enfin, vous regarde.');
 
-  // Onglets
-  ['Améliorations', 'Bonus permanents'].forEach((nom, i) => {
-    const x = 56 + i * 150, y = 76, w = 140, h = 24;
+  // Onglets. Le compteur de pieces secretes s'affiche a cote quand il existe :
+  // une monnaie qu'on ne voit nulle part n'existe pas pour le joueur.
+  if (partie.secretsVus) {
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#a8d8ff';
+    ctx.fillText((partie.piecesSecretes || 0) + ' BC secret' +
+                 ((partie.piecesSecretes || 0) > 1 ? 's' : ''), LARGEUR - 56, 68);
+    ctx.textAlign = 'left';
+  }
+
+  const noms = ongletsBoutique();
+  const largeurOnglet = noms.length > 2 ? 108 : 140;
+  noms.forEach((nom, i) => {
+    const x = 56 + i * (largeurOnglet + 10), y = 76, w = largeurOnglet, h = 24;
     const actif = ongletBoutique === i;
     const survol = souris.survol && souris.survol.action === 'onglet-boutique' &&
                    souris.survol.valeur === i;
@@ -776,10 +815,13 @@ function dessinerBoutique() {
     if (survol && souris.bouge && i !== indexBoutique) indexBoutique = i;
 
     const basique = ongletBoutique === 0;
-    const niveau = basique ? partie.ameliorations[a.cle] : (aPermanent(a.cle) ? 1 : 0);
+    const secret = ongletBoutique === 2;
+    const niveau = basique ? partie.ameliorations[a.cle]
+                 : secret ? (aSecret(a.cle) ? 1 : 0)
+                 : (aPermanent(a.cle) ? 1 : 0);
     const maxi = basique ? niveau >= a.paliers : niveau > 0;
     const prix = basique ? coutAmelioration(a) : a.cout;
-    const abordable = partie.pieces >= prix;
+    const abordable = secret ? (partie.piecesSecretes || 0) >= prix : partie.pieces >= prix;
 
     ctx.fillStyle = actif ? 'rgba(232,182,44,.13)' : 'rgba(255,255,255,.03)';
     ctx.fillRect(56, y - 14, LARGEUR - 112, 40);
@@ -789,9 +831,14 @@ function dessinerBoutique() {
     ctx.fillStyle = maxi ? 'rgba(126,224,138,.9)' : '#e6e8f0';
     ctx.fillText(a.nom, 70, y);
 
+    /* Le detail est BORNE. Il partage sa rangee avec l'etat courant
+       (« actuel : 20 % de blocage · +5 BC au suivant »), aligne a droite : un
+       libelle un peu long passait par-dessus et les deux devenaient
+       illisibles. On coupe plutot que de laisser deux textes se marcher
+       dessus — et la coupure se voit, ce qui signale qu'il faut raccourcir. */
     ctx.font = '9px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,.4)';
-    ctx.fillText(a.detail, 70, y + 14);
+    ctx.fillText(tronquer(a.detail, largeurDetail(basique)), 70, y + 14);
 
     // Paliers ou etat
     ctx.textAlign = 'right';
@@ -812,14 +859,23 @@ function dessinerBoutique() {
       ctx.fillStyle = 'rgba(126,224,138,.9)';
       ctx.fillText(basique ? 'MAX' : 'ACQUIS', LARGEUR - 70, y + 4);
     } else {
-      ctx.fillStyle = abordable ? ACCENT : 'rgba(255,255,255,.28)';
-      ctx.fillText(prix + ' BC', LARGEUR - 70, y + 4);
+      ctx.fillStyle = abordable ? (secret ? '#a8d8ff' : ACCENT) : 'rgba(255,255,255,.28)';
+      ctx.fillText(prix + (secret ? ' BC secret' : ' BC'), LARGEUR - 70, y + 4);
     }
     ctx.textAlign = 'left';
 
     zone(56, y - 14, LARGEUR - 112, 40, 'article', i);
     y += 46;
   });
+
+  /* Ce qui viendra. On le dit clairement plutot que de laisser croire que la
+     section est complete — et on ne met pas de bouton, parce qu'un bouton qui
+     ne fait rien est pire qu'une ligne de texte honnete. */
+  if (ongletBoutique === 2) {
+    ctx.font = 'italic 9px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(168,216,255,.45)';
+    ctx.fillText('À venir : ' + SECRETS_A_VENIR.join(' · '), 70, y + 4);
+  }
 
   ctx.font = '9px system-ui, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,.3)';
@@ -833,8 +889,12 @@ function acheterArticleCourant() {
   const a = liste[indexBoutique];
   if (!a) return;
   const basique = ongletBoutique === 0;
-  const maxi = basique ? partie.ameliorations[a.cle] >= a.paliers : aPermanent(a.cle);
+  const secret = ongletBoutique === 2;
+  const maxi = basique ? partie.ameliorations[a.cle] >= a.paliers
+             : secret ? aSecret(a.cle)
+             : aPermanent(a.cle);
   const prix = basique ? coutAmelioration(a) : a.cout;
+  const monnaie = secret ? (partie.piecesSecretes || 0) : partie.pieces;
 
   if (maxi) {
     audio.bruit('refus');
@@ -843,20 +903,26 @@ function acheterArticleCourant() {
       : 'Tu l\'as déjà. Je te le revends pas deux fois, je suis honnête.');
     return;
   }
-  if (partie.pieces < prix) {
+  if (monnaie < prix) {
     audio.bruit('refus');
-    braddyDit('Mhh. J\'ai jamais été bon en maths, mais je pense que les comptes n\'y sont pas.');
+    braddyDit(secret
+      ? 'Ça se paie en Brad Coins secrets, et tu n\'en as pas assez. Va en trouver. Bon courage.'
+      : 'Mhh. J\'ai jamais été bon en maths, mais je pense que les comptes n\'y sont pas.');
     return;
   }
 
   demanderConfirmation(
     'Es-tu sûr de vouloir passer la transaction ? « ' + a.nom + ' » pour ' + prix +
-    ' Brad Coins. ' + a.phrase,
+    (secret ? ' Brad Coin secret. ' : ' Brad Coins. ') + a.phrase,
     () => {
-      const ok = basique ? acheterAmelioration(a) : acheterPermanent(a);
+      const ok = basique ? acheterAmelioration(a)
+               : secret ? acheterSecret(a)
+               : acheterPermanent(a);
       if (ok) {
         audio.bruit('valider');
-        braddyDit('Transaction validée. Tu sens la différence ? Moi non plus, mais elle est là.');
+        braddyDit(secret
+          ? 'Voilà. Dépensé. J\'espère que tu sais ce que tu fais, parce que moi pas du tout.'
+          : 'Transaction validée. Tu sens la différence ? Moi non plus, mais elle est là.');
       }
     });
 }

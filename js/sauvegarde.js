@@ -46,9 +46,11 @@ const AMELIORATIONS = [
   },
   {
     cle: 'resistance', nom: 'Résistance', paliers: 10,
-    detail: '+10 % par palier, jusqu\'à +100 %',
-    valeur: n => n * 10, unite: ' %',
-    phrase: 'Tu encaisses mieux. Le Serrano fait moins mal.',
+    // Court expres : la ligne de detail partage sa rangee avec l'etat courant,
+    // et un texte trop long allait se superposer a « actuel : … ».
+    detail: '+5 % de chance d\'ignorer un coup',
+    valeur: n => n * 5, unite: ' % de blocage',
+    phrase: 'Un coup sur deux peut ne pas compter. Tu le verras : un bouclier s\'affiche.',
   },
 ];
 
@@ -173,8 +175,73 @@ const partie = {
   codes: [],                    // codes du jukebox deja entres
   objets: [],                   // pieces de l'appareil a raclette recuperees
   bossVaincus: [],              // ids des niveaux dont le boss est tombe
+  piecesSecretes: 0,            // Brad Coins secrets en poche
+  secretsVus: false,            // la section Secrets de la boutique est ouverte
+  secrets: [],                  // ameliorations secretes achetees
   maj: 0,
 };
+
+/* -----------------------------------------------------------------------------
+   LES BRAD COINS SECRETS
+
+   Une seconde monnaie, decrite dans la roadmap : « une ressource obtenue en
+   effectuant des boss secondaires ou avec une faible probabilite si un ennemi
+   est elimine (n'importe lequel, avec une probabilite de 1.67 %, qui ne
+   s'accumule pas) ».
+
+   Elle n'existait pas dans le code jusqu'ici — d'ou le fait qu'on n'en ait
+   jamais trouve.
+
+   La section Secrets de la boutique reste INVISIBLE tant qu'on n'a pas trouve
+   la premiere piece. Un onglet vide qu'on ne peut pas remplir est une promesse
+   frustrante ; un onglet qui apparait le jour ou l'on a de quoi y acheter
+   quelque chose est une recompense. Le BRADDY3000 l'annonce au retour a la
+   base, ce qui fait de la premiere piece un evenement.
+-------------------------------------------------------------------------- */
+
+const CHANCE_BC_SECRET = 0.0167;      // par elimination, sans accumulation
+
+const SECRETS = [
+  {
+    cle: 'double-saut', nom: 'Double saut', cout: 1,
+    detail: 'Un second saut en plein vol.',
+    phrase: 'Deux sauts. J\'ai longtemps pense que c\'était physiquement discutable. Ça l\'est.',
+  },
+];
+
+/* Les trois autres aptitudes de la roadmap — frappe chargee, plaquage,
+   tourelle anti-serrano — viendront ensuite. Elles sont annoncees dans la
+   boutique mais pas achetables : promettre un bouton qui ne fait rien serait
+   pire que ne rien promettre. */
+const SECRETS_A_VENIR = ['Frappe chargée', 'Plaquage', 'Tourelle anti-serrano'];
+
+function aSecret(cle) { return partie.secrets.indexOf(cle) >= 0; }
+
+/* Ouvre la section pour de bon. Appele des qu'une piece secrete est ramassee,
+   et par le bouton de test du panneau F1. */
+function decouvrirSecrets() {
+  if (partie.secretsVus) return false;
+  partie.secretsVus = true;
+  return true;                        // vrai la premiere fois seulement
+}
+
+function peutAcheterSecret(s) {
+  return !aSecret(s.cle) && partie.piecesSecretes >= s.cout;
+}
+
+function acheterSecret(s) {
+  if (!peutAcheterSecret(s)) return false;
+  partie.piecesSecretes -= s.cout;
+  partie.secrets.push(s.cle);
+  enregistrerPartie();
+  return true;
+}
+
+/* Le double saut vient soit de l'achat secret, soit de la case du panneau de
+   developpement. Une seule fonction pour que le jeu ne se contredise pas. */
+function doubleSautActif() {
+  return OPTIONS.doubleSaut || aSecret('double-saut');
+}
 
 const ARCADE_PAR_JOUR = 3;
 
@@ -185,8 +252,12 @@ function chargerPartie() {
     // On ne relit que les cles connues : une sauvegarde ancienne reste
     // valable quand de nouveaux champs apparaissent.
     ['pieces', 'tempsJoue', 'ennemisTotal', 'meilleurArcade', 'arcadeParties',
-     'entrainements', 'maj']
+     'entrainements', 'piecesSecretes', 'maj']
       .forEach(k => { if (typeof brut[k] === 'number') partie[k] = brut[k]; });
+    if (typeof brut.secretsVus === 'boolean') partie.secretsVus = brut.secretsVus;
+    if (Array.isArray(brut.secrets)) {
+      partie.secrets = brut.secrets.filter(c => SECRETS.some(s => s.cle === c));
+    }
     if (DIFFICULTES.some(d => d.cle === brut.difficulte)) partie.difficulte = brut.difficulte;
     if (UNIFORMES.some(u => u.cle === brut.uniforme)) partie.uniforme = brut.uniforme;
     if (Array.isArray(brut.termines)) partie.termines = brut.termines.filter(id => id in NIVEAUX);
@@ -247,6 +318,9 @@ function effacerPartie() {
   partie.bossVaincus = [];
   partie.piste = 'menu';
   partie.codes = [];
+  partie.piecesSecretes = 0;
+  partie.secretsVus = false;
+  partie.secrets = [];
 }
 
 /* -----------------------------------------------------------------------------
@@ -261,7 +335,12 @@ function aPermanent(cle) { return partie.permanents.indexOf(cle) >= 0; }
 
 function pvMaxDeBrad() { return 10 + partie.ameliorations.vie * 2; }
 function bonusDegats() { return 1 + partie.ameliorations.degats * 0.1; }
-function bonusResistance() { return 1 - partie.ameliorations.resistance * 0.1 * 0.5; }
+/* Probabilite qu'un coup soit purement et simplement annule. Cinq pour cent
+   par palier, dix paliers, donc la moitie des coups au maximum. Bornee des
+   deux cotes : une sauvegarde bricolee ne doit pas rendre Brad invulnerable. */
+function chanceBlocage() {
+  return Math.max(0, Math.min(0.5, partie.ameliorations.resistance * 0.05));
+}
 
 function niveauTermine(id) { return partie.termines.indexOf(id) >= 0; }
 

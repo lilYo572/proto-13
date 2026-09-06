@@ -1303,3 +1303,175 @@ une basse qu'un saut franchit.
 
 Niveau 8, puis l'espace (niveau 9, l'appareil à raclette et le troisième
 mini-boss), puis le manoir de Kirby 67 et le combat final.
+
+---
+
+# Prototype 13 — le Séraphin, corrigé
+
+## Trois corrections sur le mini-boss du niveau 6
+
+**Écraser la bonne copie ne coûte plus rien.** Le géant se recomposait à
+l'endroit exact où Brad venait d'atterrir, donc à son contact : **2 à 3 points
+de vie pour avoir résolu l'énigme**, et une mort quand la barre était basse.
+Trois changements, tous vérifiés :
+
+- un ennemi **assommé ne blesse pas** — c'est une règle de justice autant que
+  de lisibilité, un boss qui voit des étoiles ne peut pas mordre ;
+- le géant réapparaît **décalé du côté opposé à Brad** et remonté d'un cran ;
+- une seconde d'invincibilité, pour le cas où la géométrie de l'arène ne
+  laisserait pas la place.
+
+**La caméra se porte sur les copies.** Pendant la révélation elle y va
+entièrement — le joueur n'a rien d'autre à faire que regarder. Pendant le
+mélange elle en garde trois quarts, et elle rend la main à Brad au moment de
+choisir, parce qu'à cet instant il faut de nouveau se déplacer. Le poids est
+interpolé, jamais basculé : un saut de caméra au milieu d'une énigme visuelle
+ferait perdre de vue exactement ce qu'on demande de suivre.
+
+**Le piqué laisse le temps d'esquiver.** L'élan passe de 0,42 s à **0,9 s**, la
+plongée de 560 à 460 px/s, et le repos de 2,6 à 3,2 s. Surtout, il **verrouille
+sa cible au début de l'élan** et la montre par un trait au sol qui se resserre
+à mesure que l'échéance approche. Avant, il visait la position de Brad au
+moment où la plongée commençait : esquiver pendant l'élan ne servait à rien,
+la cible suivait jusqu'au dernier instant.
+
+## Un défaut de conception que le robot a révélé
+
+En rendant le combat testable, la traversée automatique du niveau 6 s'est mise
+à échouer une fois sur trois, toujours avec le même relevé : `pv 24/24,
+cycle 0`. Le robot restait à l'entrée de l'arène sans entamer le boss.
+
+La cause : le Séraphin planait à 118 px du sol. Avec un corps de 66 px, son
+bas se trouvait **six pixels au-dessus du crâne de Brad**. Chaque coup exigeait
+donc un saut, et comme la résistance ne laisse passer qu'un point tous les
+trois coups, il en fallait **dix-huit qui portent** avant la première
+duplication. Le combat n'atteignait jamais sa propre mécanique.
+
+- Hauteur de vol : 118 → **96 px**. Le bas du boss descend dans la hauteur de
+  Brad debout : on le frappe au sol, et le saut sert à le poursuivre.
+- Seuils de duplication : 75/50/25 % → **90/60/30 %**. Le bonneteau est le cœur
+  du combat, pas sa récompense finale.
+
+Un joueur qui suit correctement le vrai gagne maintenant en **12 à 15 s** au
+lieu de 20, et la traversée complète du niveau passe à chaque fois.
+
+## Livraison des musiques
+
+Le fichier envoyé au prototype 12 ne contenait que les deux pistes nouvelles —
+c'était le lot d'ajout, pas la collection. Les **17 musiques** sont désormais
+livrées en deux archives de 24 Mio (la conversation plafonne à 30 Mio par
+fichier), et les mêmes deux lots existent dans `_envois-github/` : chacun passe
+sous le plafond global de GitHub, qui refusait déjà un envoi de 48 Mo.
+
+## Vérification
+
+**88 vérifications**, 0 échec, stables sur trois exécutions consécutives. Les
+huit nouvelles portent sur ces corrections : le coût nul de l'identification
+sur les trois difficultés, la durée de l'élan, le verrouillage de la cible,
+la position de Brad hors du point d'impact, le poids de la caméra pendant la
+duplication, son cadrage réel sur le centre de l'éventail, et sa restitution
+au moment du choix.
+
+---
+
+# Prototype 14 — le Séraphin domptable, la résistance qui se voit, les secrets
+
+## Le bug du Séraphin : une erreur d'unité
+
+Tu décrivais un boss qui fonce dès l'entrée et tient la vitesse de Brad. La
+cause est une ligne que j'avais écrite au prototype 12 :
+
+```js
+const base = b.t.vitesse * vitesseEnnemiEffective() * 62;
+```
+
+J'avais pris `vitesseEnnemiEffective()` pour un multiplicateur autour de 1.
+C'est une **vitesse en pixels par seconde** — 42 par défaut. Le facteur 62 la
+multipliait une seconde fois : le Séraphin volait à **2 083 px/s**, huit fois
+la course de Brad. Il traversait l'arène en un tiers de seconde et ne lâchait
+plus jamais.
+
+Sans le facteur, il vole à **92 px/s** — plus lent que la *marche* de Brad
+(150). Mesuré : après huit secondes de course, Brad est à 449 px devant lui et
+n'a pas perdu un seul point de vie.
+
+**Et le contact ne blesse plus.** Depuis que je l'ai fait voler bas pour qu'on
+puisse le frapper au sol, il touchait Brad rien qu'en existant. Seul son
+**piqué** coûte désormais quelque chose : il est annoncé, visé, esquivable.
+Un géant qui plane n'est pas une machine à dégâts.
+
+**Une conséquence trouvée en testant** : on pouvait frapper la bonne copie
+**pendant la révélation**, c'est-à-dire pendant que le jeu la désigne d'un halo
+et d'une flèche. Un joueur rapide gagnait le combat sans jamais voir un seul
+mélange. On regarde d'abord — le coup est refusé, et le jeu le dit.
+
+## La résistance, refondue
+
+Ton idée, et elle corrige un vrai défaut : l'ancienne formule réduisait les
+dégâts de 5 % par palier, un effet réel mais que le joueur ne voyait **jamais**
+— un coup à 3 restait un coup à 3 après arrondi.
+
+Désormais : **5 % de chance par palier d'annuler entièrement un coup**, dix
+paliers, jusqu'à 50 %. Un écusson bleu s'affiche, un son tinte, et on sait à
+cet instant précis que l'achat vient de servir. Coût inchangé (30 BC, +5 par
+palier).
+
+Mesuré sur 4 000 coups par palier : 0 %, 25,4 % et 49,8 % de blocage pour 0, 5
+et 10 paliers. Et un coup qui passe fait les **dégâts pleins** — il n'y a plus
+de réduction cachée en plus du hasard.
+
+## Les Brad Coins secrets
+
+**Réponse à ta question : ils n'existaient pas.** Aucune trace dans le code.
+Tu n'as pas manqué de chance, il n'y avait rien à trouver.
+
+- **1,67 %** par élimination, le chiffre de ta roadmap. Mesuré sur 20 000
+  éliminations : 1,66 %. **Jamais au camp d'entraînement** — vérifié sur 5 000
+  éliminations, zéro.
+- **+1 garanti par mini-boss**, lâché au sol comme la pièce de l'appareil.
+- La pièce est **bleue, plus grosse, entourée d'un halo** : impossible de la
+  confondre avec une pièce dorée. Une pièce qui tombe une fois sur soixante ne
+  doit pas se rater faute d'être reconnue.
+- **La section Secrets de la boutique reste fermée** jusqu'à la première
+  trouvaille, comme tu le proposais — je suis d'accord, un onglet vide qu'on ne
+  peut pas remplir est une promesse frustrante. Le BRADDY3000 l'annonce au
+  retour à la base.
+- **Le double saut** y coûte 1 BC secret. Les trois autres aptitudes de la
+  roadmap sont annoncées mais pas achetables : un bouton qui ne fait rien est
+  pire qu'une ligne de texte honnête.
+
+## La fanfare de victoire
+
+À la chute d'un mini-boss, la musique du combat **s'arrête net**, une fanfare
+de trois secondes et demie joue seule, puis le thème du niveau revient en
+fondu au bout de 4,2 secondes. Le retour est compté dans la boucle du jeu et
+non par un minuteur : sinon la musique reviendrait pendant l'écran de pause.
+
+La fanfare est **synthétisée** avec les mêmes oscillateurs que les autres sons
+— il n'existe aucun fichier de musique de victoire dans le dossier. Le jour où
+tu en auras un, il suffira de le jouer à la place : l'enchaînement ne changera
+pas.
+
+## La téléportation (panneau F1)
+
+Choix du niveau, puis du point d'arrivée — début, premier quart, milieu, arène
+du boss, devant la porte. Plus trois boutons de test : +100 BC, +1 BC secret,
+vie au maximum.
+
+Deux précautions : elle **débloque les niveaux précédents** (arriver au niveau
+6 avec une carte qui prétend qu'on n'a pas fini le premier produirait des bugs
+qui n'existent pas), et elle **pose la caméra et la zone à la main** au lieu de
+les laisser rattraper.
+
+## Vérification
+
+**116 vérifications**, 0 échec, stables sur trois exécutions. Trois défauts de
+la suite elle-même ont été corrigés au passage — des sections qui se
+transmettaient un état : le robot de traversée héritait du double saut acheté
+par le test des secrets et ratait la barre mobile du niveau 5, et le test des
+lasers héritait d'une résistance à 50 % qui bloquait la moitié des tirs. Chaque
+section repart maintenant d'un Brad nu.
+
+Un défaut d'affichage trouvé par une capture : le libellé de la résistance
+passait par-dessus la colonne « actuel : … ». Les deux textes sont désormais
+bornés, et un test refuse tout libellé trop long pour sa colonne.

@@ -259,7 +259,9 @@ const audio = {
     osc.stop(t0 + duree + 0.02);
   },
 
-  souffle({ duree, gain, filtre }) {
+  // `retard` a ete ajoute pour la fanfare : un accent percussif doit pouvoir
+  // tomber avec l'accord, pas seulement au tout debut.
+  souffle({ duree, gain, filtre, retard }) {
     if (!this.ac || R.volEffets <= 0) return;
     const n = Math.floor(this.ac.sampleRate * duree);
     const tampon = this.ac.createBuffer(1, n, this.ac.sampleRate);
@@ -273,7 +275,36 @@ const audio = {
     const g = this.ac.createGain();
     g.gain.value = gain === undefined ? 0.2 : gain;
     src.connect(bp); bp.connect(g); g.connect(this.sortieEffets);
-    src.start();
+    src.start(this.ac.currentTime + (retard || 0));
+  },
+
+  /* LA FANFARE DE VICTOIRE.
+
+     Il n'existe aucun fichier de musique de victoire dans le dossier, et en
+     inventer un n'est pas mon travail : celle-ci est SYNTHETISEE avec les
+     memes oscillateurs que tous les autres sons du jeu. Trois secondes et
+     demie, une montee puis un accord tenu. Le jour ou une vraie piste existe,
+     il suffira de la jouer a la place — l'enchainement (couper, fanfare,
+     revenir en fondu) ne changera pas.
+
+     Elle est volontairement plus forte que les bruitages : c'est le seul
+     moment du jeu ou l'on a le droit de couper la musique du niveau. */
+  fanfare() {
+    if (!this.ac) return;
+    // Do - Mi - Sol - Do, puis l'accord.
+    const montee = [523, 659, 784, 1047];
+    montee.forEach((f, i) => {
+      this.ton({ de: f, vers: f, duree: 0.22, forme: 'square', gain: 0.2, retard: i * 0.13 });
+      this.ton({ de: f / 2, vers: f / 2, duree: 0.22, forme: 'triangle', gain: 0.12, retard: i * 0.13 });
+    });
+    // L'accord tenu, avec une quinte pour l'assise.
+    [523, 659, 784, 1047].forEach((f, i) => {
+      this.ton({ de: f, vers: f, duree: 1.5, forme: 'triangle', gain: 0.13, retard: 0.56 + i * 0.02 });
+    });
+    this.ton({ de: 262, vers: 262, duree: 1.6, forme: 'square', gain: 0.1, retard: 0.56 });
+    // Deux accents percussifs : la fanfare doit avoir un corps.
+    this.souffle({ duree: 0.18, gain: 0.14, filtre: 2600, retard: 0 });
+    this.souffle({ duree: 0.3, gain: 0.12, filtre: 1400, retard: 0.56 });
   },
 
   bruit(nom) {
@@ -293,6 +324,10 @@ const audio = {
                       this.souffle({ duree: 0.35, gain: 0.18, filtre: 1800 }); break;
       case 'mort':    this.ton({ de: 420, vers: 60, duree: 0.7, forme: 'square', gain: 0.26 }); break;
       // Une dalle qui lache : un craquement sec, puis la chute.
+      // Le blocage de la resistance : un tintement clair, tres court, qui ne
+      // se confond avec aucun autre son du jeu.
+      case 'bouclier': this.ton({ de: 880, vers: 1320, duree: 0.1, forme: 'triangle', gain: 0.18 });
+                      this.ton({ de: 1320, vers: 1760, duree: 0.16, forme: 'triangle', gain: 0.12, retard: 0.07 }); break;
       case 'craque':  this.souffle({ duree: 0.09, gain: 0.13, filtre: 3200 });
                       this.ton({ de: 260, vers: 90, duree: 0.22, forme: 'triangle', gain: 0.13 }); break;
       case 'menu':    this.ton({ de: 620, vers: 620, duree: 0.05, forme: 'square', gain: 0.1 }); break;

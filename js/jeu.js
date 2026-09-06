@@ -1422,6 +1422,29 @@ function dessinerRamassages() {
       ctx.fillRect(x + 4 - l / 2, y, Math.max(1, l), 8);
       ctx.fillStyle = ACCENT;
       ctx.fillRect(x + 4 - l / 2, y, Math.max(1, l - 2), 7);
+    } else if (r.genre === 'piece-secrete') {
+      /* Le Brad Coin secret. Il devait etre impossible a confondre avec une
+         piece ordinaire : bleu au lieu de dore, plus gros, entoure d'un halo
+         qui respire, avec une etoile au centre. Elle tombe une fois sur
+         soixante — la rater faute de l'avoir reconnue serait cruel. */
+      const t = performance.now() / 1000;
+      const cx = x + r.w / 2, cy = y + r.h / 2 + Math.sin(t * 2.6) * 2;
+      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, 20);
+      g.addColorStop(0, 'rgba(168,216,255,' + (0.4 + 0.2 * Math.sin(t * 3)).toFixed(2) + ')');
+      g.addColorStop(1, 'rgba(168,216,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - 22, cy - 22, 44, 44);
+
+      const l = Math.abs(Math.cos(r.phase)) * 12;
+      ctx.fillStyle = '#2a5c8a';
+      ctx.fillRect(cx - l / 2, cy - 6, Math.max(1, l), 12);
+      ctx.fillStyle = '#a8d8ff';
+      ctx.fillRect(cx - l / 2, cy - 6, Math.max(1, l - 2), 11);
+      if (l > 6) {
+        ctx.fillStyle = '#1d3f5e';
+        ctx.fillRect(cx - 1, cy - 4, 2, 8);
+        ctx.fillRect(cx - 4, cy - 1, 8, 2);
+      }
     } else {
       ctx.fillStyle = '#7ee08a';
       ctx.fillRect(x + 3, y, 4, 10);
@@ -1450,6 +1473,42 @@ function dessinerEffets() {
       ctx.fillText(f.texte, Math.round(f.x - cam.x), Math.round(f.y - cam.y));
       ctx.globalAlpha = 1;
       ctx.textAlign = 'left';
+    } else if (f.genre === 'bouclier') {
+      /* Un ecusson bleu qui grandit et s'efface. Dessine en primitives, comme
+         les pieces de l'appareil : c'est une icone unique, elle n'a pas besoin
+         d'un fichier a elle. */
+      const x = Math.round(f.x - cam.x);
+      const y = Math.round(f.y - cam.y) - Math.round(p * 12);
+      const e = 1 + p * 0.5;
+      ctx.save();
+      ctx.globalAlpha = 1 - p * p;
+      ctx.translate(x, y);
+      ctx.scale(e, e);
+      // Halo
+      const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
+      g.addColorStop(0, 'rgba(120,190,255,.45)');
+      g.addColorStop(1, 'rgba(120,190,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(-24, -24, 48, 48);
+      // L'ecusson
+      ctx.beginPath();
+      ctx.moveTo(0, -11);
+      ctx.lineTo(9, -7);
+      ctx.lineTo(9, 2);
+      ctx.quadraticCurveTo(9, 9, 0, 12);
+      ctx.quadraticCurveTo(-9, 9, -9, 2);
+      ctx.lineTo(-9, -7);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(40,80,130,.9)';
+      ctx.fill();
+      ctx.strokeStyle = '#a8d8ff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Le reflet
+      ctx.fillStyle = 'rgba(200,232,255,.55)';
+      ctx.fillRect(-5, -6, 4, 10);
+      ctx.restore();
+      ctx.globalAlpha = 1;
     } else if (f.genre === 'onde') {
       ctx.globalAlpha = 0.75 * (1 - p);
       ctx.strokeStyle = ACCENT;
@@ -1827,6 +1886,88 @@ document.getElementById('exporter').onclick = async ev => {
 
 document.getElementById('relancer').onclick = () => { preparerNiveau(); };
 document.getElementById('aller-menu').onclick = () => { retourAuMenu(); };
+
+/* -----------------------------------------------------------------------------
+   TELEPORTATION — outil de test
+
+   Retraverser six niveaux pour verifier une correction sur le boss du sixieme
+   n'apprend rien a personne. Ce bloc pose Brad ou on le demande.
+
+   Deux precautions :
+
+   - il DEBLOQUE les niveaux precedents. Se retrouver au niveau 6 avec une carte
+     qui pretend qu'on n'a pas fini le premier donnerait un etat que le jeu ne
+     produit jamais, et donc des bugs qui n'existent pas ;
+   - il pose la camera et la zone affichee a la main. La camera rattrape Brad
+     avec de l'inertie : sans ça, on regarde le decor de la zone 1 pendant deux
+     secondes en se demandant ce qui se passe.
+-------------------------------------------------------------------------- */
+
+const tpNiveau = document.getElementById('tp-niveau');
+const tpOu = document.getElementById('tp-ou');
+
+ORDRE_NIVEAUX.concat(['entrainement']).forEach(id => {
+  const o = document.createElement('option');
+  o.value = id;
+  o.textContent = (NIVEAUX[id] && NIVEAUX[id].nom) || id;
+  tpNiveau.appendChild(o);
+});
+
+function teleporter(id, ou) {
+  const d = NIVEAUX[id];
+  if (!d) return;
+
+  // La carte doit rester coherente : on marque comme termines tous les niveaux
+  // qui precedent celui-la.
+  const rang = ORDRE_NIVEAUX.indexOf(id);
+  if (rang > 0) {
+    partie.existe = true;
+    for (let i = 0; i < rang; i++) {
+      if (partie.termines.indexOf(ORDRE_NIVEAUX[i]) < 0) partie.termines.push(ORDRE_NIVEAUX[i]);
+    }
+    enregistrerPartie();
+  }
+
+  relancerNiveau(id);
+  scene = 'jeu';
+
+  let tuile = d.apparition.x;
+  if (ou === 'quart') tuile = d.largeur * 0.25;
+  else if (ou === 'milieu') tuile = d.largeur * 0.5;
+  else if (ou === 'porte') tuile = Math.max(2, d.porte.x - 6);
+  else if (ou === 'arene') tuile = d.arene ? d.arene.x1 - 4 : d.largeur * 0.5;
+
+  brad.x = tuile * TUILE;
+  brad.y = (d.apparition.y - 1) * TUILE;
+  brad.vx = 0; brad.vy = 0;
+  pointSur.x = brad.x; pointSur.y = brad.y;
+
+  cam.x = Math.max(0, Math.min(NIVEAU_L - LARGEUR, brad.x + brad.w / 2 - LARGEUR / 2));
+  cam.y = NIVEAU_H - HAUTEUR;
+  cam.regard = 0;
+  zoneAffichee = zoneDe(brad.x);
+  if (AUDIO_NIVEAU) audio.jouerMusique(AUDIO_NIVEAU, 0.4);
+}
+
+document.getElementById('tp-aller').onclick = () => teleporter(tpNiveau.value, tpOu.value);
+document.getElementById('tp-hub').onclick = () => {
+  partie.existe = true;
+  if (partie.termines.length === 0) partie.termines.push('intro');
+  enregistrerPartie();
+  entrerHub(false);
+};
+document.getElementById('tp-bc').onclick = () => {
+  partie.pieces += 100; enregistrerPartie(); audio.bruit('piece');
+};
+document.getElementById('tp-bcs').onclick = () => {
+  partie.piecesSecretes = (partie.piecesSecretes || 0) + 1;
+  decouvrirSecrets();
+  enregistrerPartie();
+  audio.bruit('victoire');
+};
+document.getElementById('tp-soin').onclick = () => {
+  brad.pvMax = pvMaxDeBrad(); brad.pv = brad.pvMax; brad.shy = 100;
+};
 
 [['opt-double-saut', 'doubleSaut'], ['opt-saut-ennemi', 'sautEnnemi'],
  ['opt-hitbox', 'hitbox'], ['opt-traces', 'traces']]

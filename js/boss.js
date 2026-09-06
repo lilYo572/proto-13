@@ -85,6 +85,7 @@ const arene = {
   tempsDup: 0,
   noirceur: 0,          // obscurite courante, 0 a 1
   noirceurCible: 0,
+  retourMusique: 0,     // compte a rebours avant le retour du theme du niveau
 };
 
 function reinitialiserArene() {
@@ -115,6 +116,7 @@ function reinitialiserArene() {
   // sinon le niveau entier dans le noir jusqu'a la fin de la partie.
   arene.noirceur = 0;
   arene.noirceurCible = 0;
+  arene.retourMusique = 0;
 }
 
 /* La sortie du niveau reste verrouillee tant qu'un boss vit encore : un niveau
@@ -184,8 +186,22 @@ function majArene(dt) {
      que le boss est tombe : s'il mourait pendant que la salle etait encore
      sombre — ce qui arrive a chaque fois, puisqu'on le tue assomme — le
      niveau restait a moitie eteint jusqu'a la porte. */
+  /* Vitesse d'extinction. Elle etait de 2,2 par seconde : le manoir mettait
+     plus d'une seconde et demie a s'eteindre vraiment, et comme un joueur
+     attentif designe la bonne copie en moins de temps que ça, l'obscurite
+     n'atteignait jamais sa valeur pleine — on jouait le bonneteau dans une
+     penombre tiede. A 3,6 la lumiere tombe en trois dixiemes de seconde, ce
+     qui reste une transition continue et non un interrupteur. */
   if (arene.finie || !arene.active) arene.noirceurCible = 0;
-  arene.noirceur += (arene.noirceurCible - arene.noirceur) * Math.min(1, 2.2 * dt);
+  arene.noirceur += (arene.noirceurCible - arene.noirceur) * Math.min(1, 3.6 * dt);
+
+  // Le retour de la musique du niveau, apres la fanfare de victoire.
+  if (arene.retourMusique > 0) {
+    arene.retourMusique -= dt;
+    if (arene.retourMusique <= 0 && AUDIO_NIVEAU) {
+      audio.jouerMusiqueDifferee(AUDIO_NIVEAU, 2.0);
+    }
+  }
 
   // --- Declenchement : Brad franchit la ligne d'entree ---------------------
   if (!arene.active && !arene.finie) {
@@ -435,8 +451,21 @@ function majEchanges(dt) {
 /* Appele par blesserEnnemi() des qu'une copie est touchee, au poing comme au
    saut. */
 function frapperCopie(c) {
-  if (arene.phase !== 'melange' && arene.phase !== 'choix' &&
-      arene.phase !== 'revelation') return;
+  /* PENDANT LA REVELATION, ON REGARDE — ON NE FRAPPE PAS.
+
+     Le vrai est montre avec un halo et une fleche : pouvoir le toucher a cet
+     instant supprimerait purement et simplement l'enigme, puisqu'il suffirait
+     de frapper la copie designee. Un joueur rapide gagnait ainsi le combat
+     sans jamais voir un seul melange.
+
+     On le refuse donc, et on le DIT : un coup qui ne fait rien sans explication
+     passe pour un bug. */
+  if (arene.phase === 'revelation') {
+    audio.bruit('blinde');
+    texteFlottant(c.x + c.w / 2, c.y, 'regarde d\'abord', '#ffe9a8');
+    return;
+  }
+  if (arene.phase !== 'melange' && arene.phase !== 'choix') return;
 
   const i = arene.copies.indexOf(c);
   if (i >= 0) arene.copies.splice(i, 1);
@@ -634,8 +663,22 @@ function majSeraphin(b, dt, dx, dy) {
     return;
   }
 
-  // --- Vol de croisiere : il suit Brad, sans jamais le rattraper d'un coup.
-  const base = b.t.vitesse * vitesseEnnemiEffective() * 62;
+  /* --- Vol de croisiere : il suit Brad, sans jamais pouvoir le rattraper.
+
+     ERREUR CORRIGEE ICI. La ligne etait :
+
+         const base = b.t.vitesse * vitesseEnnemiEffective() * 62;
+
+     J'avais pris `vitesseEnnemiEffective()` pour un multiplicateur autour de 1.
+     C'est une VITESSE EN PIXELS PAR SECONDE — 42 par defaut. Le facteur 62 la
+     multipliait donc une seconde fois : le Seraphin volait a 2 083 px/s, soit
+     huit fois la course de Brad. Il traversait l'arene en un tiers de seconde
+     des l'entree et ne le lachait plus jamais.
+
+     Sans le facteur, il vole a 92 px/s : plus lent que la MARCHE de Brad (150).
+     On peut donc toujours s'en eloigner, ce qui est la condition pour que le
+     combat soit une question de placement et non d'endurance. */
+  const base = b.t.vitesse * vitesseEnnemiEffective();
   const viseX = brad.x + brad.w / 2 - b.w / 2;
   const ecart = viseX - b.x;
   b.vx = Math.max(-base, Math.min(base, ecart * 1.6));
@@ -762,6 +805,11 @@ function lancerVague() {
   }
 }
 
+/* Duree de la fanfare, apres quoi la musique du niveau revient en fondu. Un
+   peu plus longue que la fanfare elle-meme : le silence d'une demi-seconde
+   avant le retour fait respirer la victoire. */
+const DUREE_FANFARE = 4.2;
+
 function terminerArene() {
   arene.finie = true;
   // Une copie survivante resterait a flotter dans une salle sans boss.
@@ -772,14 +820,34 @@ function terminerArene() {
   arene.copies = [];
   arene.phase = 'geant';
   arene.noirceurCible = 0;
-  if (ARENE.musique && AUDIO_NIVEAU) audio.jouerMusiqueDifferee(AUDIO_NIVEAU, 1.6);
+
+  /* La musique du boss s'arrete NET, la fanfare joue seule, puis le niveau
+     revient en fondu. Enchainer directement sur la musique du niveau donnait
+     une victoire sans respiration : le combat se terminait et l'ambiance
+     reprenait comme si rien ne s'etait passe.
+
+     Le retour est compte dans majArene, pas par un setTimeout : sinon la
+     musique reviendrait pendant l'ecran de pause. */
+  audio.arreterMusique(0.3);
+  audio.fanfare();
+  arene.retourMusique = DUREE_FANFARE;
+
   arene.active = false;
   arene.secousseFin = 1.2;
   secousse(12, 0.8);
-  audio.bruit('victoire');
 
   if (partie.bossVaincus.indexOf(niveauCourant) < 0 && !ENTRAINEMENT) {
     partie.bossVaincus.push(niveauCourant);
+    /* Un Brad Coin secret GARANTI par mini-boss, comme le prevoit la roadmap
+       (« +8BC et +1BCSecret pour chaque Boss secondaire accompli »). Il tombe
+       au sol comme la piece de l'appareil : on va le chercher, on ne le
+       recoit pas dans un ecran de bilan. Une seule fois par boss — le
+       controle sur `bossVaincus` s'en charge. */
+    ramassages.push({
+      genre: 'piece-secrete',
+      x: arene.boss.x + arene.boss.w / 2 - 7, y: arene.boss.y + 10, w: 14, h: 14,
+      vx: -60, vy: -210, vie: 9999, phase: 0,
+    });
     enregistrerPartie();
   }
 
@@ -889,6 +957,45 @@ function prendreObjet(cle) {
   arene.messageT = 4.0;
   particules(brad.x + brad.w / 2, brad.y + brad.h / 2, 22, '#ffe9a8');
   if (nouveau) objetFraisRamasse = cle;
+}
+
+/* Le ramassage d'un Brad Coin secret. La premiere fois, il ouvre la section
+   Secrets de la boutique et le BRADDY3000 en parlera au retour a la base :
+   c'est ce qui transforme une piece rare en evenement plutot qu'en ligne de
+   compteur. */
+let secretFraisTrouve = false;
+let premierSecret = false;
+
+function prendrePieceSecrete() {
+  partie.piecesSecretes = (partie.piecesSecretes || 0) + 1;
+  const premiere = decouvrirSecrets();
+  enregistrerPartie();
+
+  secretFraisTrouve = true;
+  if (premiere) premierSecret = true;
+
+  audio.bruit('victoire');
+  texteFlottant(brad.x + brad.w / 2, brad.y - 6, 'BRAD COIN SECRET', '#a8d8ff');
+  particules(brad.x + brad.w / 2, brad.y + brad.h / 2, 24, '#a8d8ff');
+  secousse(5, 0.25);
+  if (typeof annoncerArene === 'function' && ARENE) annoncerArene('BRAD COIN SECRET', 3.0);
+}
+
+/* Consomme le drapeau : le BRADDY3000 ne commente la trouvaille qu'une fois. */
+function prendreRepliqueSecret() {
+  if (!secretFraisTrouve) return null;
+  secretFraisTrouve = false;
+  if (premierSecret) {
+    premierSecret = false;
+    return 'Tu as trouvé un Brad Coin SECRET. Je croyais que c\'était une légende ' +
+           'que je m\'étais racontée. La boutique a maintenant un rayon de plus — ' +
+           'va voir, je ne sais pas moi-même ce qu\'il y a dedans.';
+  }
+  return auHasard([
+    'Encore un Brad Coin secret. À ce rythme tu vas m\'obliger à tenir un second tableau.',
+    'Un secret de plus en poche. Ne le dépense pas n\'importe où. Enfin, il n\'y a pas beaucoup de choix.',
+    'Ces pièces-là tombent une fois sur soixante. Statistiquement, tu me dois une explication.',
+  ]);
 }
 
 /* Consomme le drapeau : la replique speciale ne se dit qu'une fois. */

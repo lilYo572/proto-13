@@ -159,7 +159,9 @@ function majBrad(dt) {
   brad.coyote = brad.auSol ? R.coyote : Math.max(0, brad.coyote - dt);
   brad.tampon = sautPresseCeTick ? R.tampon : Math.max(0, brad.tampon - dt);
 
-  const peutSauter = (brad.coyote > 0 || (OPTIONS.doubleSaut && brad.sautsRestants > 0))
+  // Le double saut vient desormais de la boutique secrete autant que de la
+  // case du panneau de developpement : une seule fonction decide.
+  const peutSauter = (brad.coyote > 0 || (doubleSautActif() && brad.sautsRestants > 0))
                      && brad.scenarise <= 0;
   if (brad.tampon > 0 && peutSauter) {
     audio.bruit('saut');
@@ -201,9 +203,9 @@ function majBrad(dt) {
   if (brad.auSol && !etaitAuSol) {
     const force = Math.min(1, Math.abs(brad.vy || R.chuteMax) / R.chuteMax);
     brad.etirement = 1 - 0.3 * Math.max(0.35, force);
-    brad.sautsRestants = OPTIONS.doubleSaut ? 1 : 0;
+    brad.sautsRestants = doubleSautActif() ? 1 : 0;
   }
-  if (brad.auSol) brad.sautsRestants = OPTIONS.doubleSaut ? 1 : 0;
+  if (brad.auSol) brad.sautsRestants = doubleSautActif() ? 1 : 0;
   if (!brad.auSol) brad.hauteurMax = Math.max(brad.hauteurMax, brad.yDepartSaut - brad.y);
 
   majAttaque(dt);
@@ -290,9 +292,28 @@ function declencherOnde() {
 
 function blesserBrad(degats, sourceX, nomSource) {
   if (brad.invincible > 0 || brad.scenarise > 0) return;
-  // La difficulte agit sur les degats subis, comme le prevoient les notes ;
-  // la resistance achetee au hub les attenue.
-  degats = Math.max(1, Math.round(degats * reglageDifficulte().degats * bonusResistance()));
+
+  /* LA RESISTANCE, NOUVELLE FORMULE.
+
+     Elle reduisait les degats de 5 % par palier — un effet reel mais que le
+     joueur ne voyait jamais : un coup a 3 restait un coup a 3 apres arrondi,
+     et il n'y avait aucun moment ou l'achat se manifestait a l'ecran.
+
+     Elle donne desormais 5 % de chance par palier d'ANNULER entierement un
+     coup, jusqu'a 50 %. Le meme investissement, mais qui se voit : un bouclier
+     s'affiche, un son tinte, et le joueur sait a cet instant precis que son
+     achat vient de le sauver. Le hasard est ici un avantage — on ne perd
+     jamais un point de vie a cause de lui, on en gagne parfois. */
+  if (Math.random() < chanceBlocage()) {
+    brad.invincible = R.invincibilite * 0.5;
+    audio.bruit('bouclier');
+    bouclier(brad.x + brad.w / 2, brad.y + brad.h / 2);
+    texteFlottant(brad.x + brad.w / 2, brad.y - 4, 'bloqué', '#78beff');
+    return;
+  }
+
+  // La difficulte agit sur les degats subis, comme le prevoient les notes.
+  degats = Math.max(1, Math.round(degats * reglageDifficulte().degats));
   brad.pv -= degats;
   brad.invincible = R.invincibilite;
   audio.bruit('degat');
@@ -495,7 +516,11 @@ const TYPES_ENNEMI = {
      jamais pendant la duplication : rien ne doit permettre de deviner le vrai
      en comptant les silhouettes.
   ------------------------------------------------------------------------- */
-  'Serra-Seraphin': { w: 58, h: 66, pv: 24, vitesse: 0.8, degats: 3, shy: 7, ecrasable: false,
+  'Serra-Seraphin': { w: 58, h: 66, pv: 24, vitesse: 2.2, degats: 3, shy: 7, ecrasable: false,
+                      // Il ne blesse qu'en piquant : voir contactEnnemi(). Un
+                      // geant qui plane a hauteur d'homme et suit Brad ferait
+                      // sinon fondre la barre de vie rien qu'en existant.
+                      degatsAuContact: false,
                       sensNatif: -1, sprite: 'Serra-Volant', echelle: 2.45, vole: true,
                       boss: true, teinte: 'rgba(198,150,255,.45)',
                       resistance: 0.3, pilotage: 'seraphin' },
@@ -681,6 +706,20 @@ function tuerEnnemi(e) {
       vie: 12, phase: Math.random() * 6,
     });
   }
+  /* Le Brad Coin secret. 1,67 % par elimination, sans accumulation — c'est le
+     chiffre de la roadmap. Jamais au camp d'entrainement : une salle ou les
+     ennemis repoussent en boucle en ferait une machine a secrets, ce qui est
+     exactement ce que le camp est cense empecher. */
+  if (!ENTRAINEMENT && Math.random() < CHANCE_BC_SECRET) {
+    ramassages.push({
+      genre: 'piece-secrete',
+      x: e.x + e.w / 2 - 7, y: e.y + e.h / 2 - 7, w: 14, h: 14,
+      vx: (Math.random() - 0.5) * 40, vy: -190,
+      vie: 9999,               // elle attend : on ne rate pas une piece si rare
+      phase: 0,
+    });
+  }
+
   // Soin : uniquement si Brad a reellement perdu de la vie, pour qu'il reste
   // sur ses gardes quand sa barre est deja pleine (demande explicite des notes).
   if (brad.pv < brad.pvMax - 1 && Math.random() < (ENTRAINEMENT ? 0.5 : 0.28)) {
@@ -1015,7 +1054,7 @@ function poserBradSur(e) {
   brad.vy = 0;
   brad.auSol = true;
   brad.coyote = R.coyote;              // il peut sauter depuis cette tete
-  brad.sautsRestants = OPTIONS.doubleSaut ? 1 : 0;
+  brad.sautsRestants = doubleSautActif() ? 1 : 0;
   brad.porteur = e;                    // consomme par majBrad a l'image suivante
 }
 
@@ -1079,6 +1118,14 @@ function contactEnnemi(e, dt) {
      bonneteau coutait deux a trois points de vie — on etait puni d'avoir
      reussi. Et visuellement, un boss qui voit des etoiles ne peut pas mordre. */
   if (e.assomme > 0) return;
+
+  /* Certains ennemis ne blessent qu'en attaquant, jamais en flottant. Le
+     Seraphin est de ceux-la : il plane a hauteur d'homme pour qu'on puisse le
+     frapper au sol, et il suit Brad. Le laisser blesser au simple contact
+     revenait a vider la barre de vie sans qu'aucune decision du joueur n'entre
+     en jeu — il suffisait qu'il soit la. Son piqué, lui, est annonce, vise, et
+     esquivable : c'est la seule chose qui doit coûter. */
+  if (e.t.degatsAuContact === false && !(e.piqueT > 0)) return;
   if (brad.invincible <= 0) {
     blesserBrad(e.t.degats, e.x + e.w / 2, e.type);
     e.vx = -Math.sign(brad.x - e.x) * 90;
@@ -1198,6 +1245,8 @@ function majRamassages(dt) {
         brad.pieces++;
         audio.bruit('piece');
         texteFlottant(brad.x + brad.w / 2, brad.y - 4, '+1 BC', '#e8b62c', 'BC');
+      } else if (r.genre === 'piece-secrete') {
+        prendrePieceSecrete();
       } else {
         brad.pv = Math.min(brad.pvMax, brad.pv + 1);
         audio.bruit('soin');
@@ -1231,6 +1280,14 @@ function particules(x, y, n, couleur) {
       t: 0, duree: 0.3 + Math.random() * 0.25, couleur,
     });
   }
+}
+
+/* Le bouclier de la resistance. Il ne suffit pas de ne pas perdre de vie : il
+   faut VOIR pourquoi. Sans ce signal, un coup encaisse sans degat passerait
+   pour un rate du jeu, et l'amelioration acheteee resterait invisible. */
+function bouclier(x, y) {
+  effets.push({ genre: 'bouclier', x, y, t: 0, duree: 0.6 });
+  particules(x, y, 8, '#a8d8ff');
 }
 
 /* Textes flottants.
