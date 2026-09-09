@@ -53,6 +53,7 @@ evaluerDansBac(
   ['js/reglages.js', 'niveaux/intro.js', 'niveaux/niveau1.js',
    'niveaux/niveau2.js', 'niveaux/niveau3.js', 'niveaux/niveau4.js',
    'niveaux/niveau5.js', 'niveaux/niveau6.js', 'niveaux/niveau7.js',
+   'niveaux/niveau8.js', 'niveaux/niveau9.js',
    'niveaux/entrainement.js'],
   bac, 'this.SCHEMA = SCHEMA;');
 
@@ -73,16 +74,31 @@ evaluerDansBac(
 /* Les valeurs par defaut viennent du SCHEMA, source unique de verite. */
 const R = {};
 for (const e of bac.SCHEMA) if (e.cle) R[e.cle] = e.defaut;
-const HAUTEUR_SAUT = (R.forceSaut * R.forceSaut) / (2 * R.gravite);
-const TEMPS_VOL = (2 * R.forceSaut) / R.gravite;
-const PORTEE_MARCHE = R.vitesseMarche * TEMPS_VOL;
-const PORTEE_COURSE = R.vitesseCourse * TEMPS_VOL;
+/* La portee du saut depend de la GRAVITE DU NIVEAU analyse. Un niveau lunaire
+   declare `gravite: 0.55` : y appliquer la gravite terrestre condamnerait des
+   plateformes parfaitement atteignables, et surtout laisserait passer des
+   trous infranchissables sur Terre. Ces trois valeurs sont donc recalculees
+   pour chaque niveau, dans analyser(). */
+function portees(gravite) {
+  const g = R.gravite * gravite;
+  const tempsVol = (2 * R.forceSaut) / g;
+  return {
+    g,
+    hauteur: (R.forceSaut * R.forceSaut) / (2 * g),
+    marche: R.vitesseMarche * tempsVol,
+    course: R.vitesseCourse * tempsVol,
+  };
+}
+const TERRE = portees(1);
 const BRAD_H = 46, BRAD_W = 22;
 
 /* --- Analyse ------------------------------------------------------------- */
 
 function analyser(id) {
   const d = bac.NIVEAUX[id];
+  const P = portees(d.gravite === undefined ? 1 : d.gravite);
+  const HAUTEUR_SAUT = P.hauteur;
+  const PORTEE_COURSE = P.course;
   const px = ([x, y, w, h]) => ({ x: x * TUILE, y: y * TUILE, w: w * TUILE, h: h * TUILE });
   const solides = d.solides.map(px);
   const traversantes = (d.traversantes || []).map(([x, y, w]) =>
@@ -148,9 +164,9 @@ function analyser(id) {
        la montee, PUIS pendant la redescente jusqu'a cette hauteur. Un modele
        en « pourcentage de la portee a plat » sous-estimait grossierement les
        petites marches et condamnait des plateformes parfaitement atteignables. */
-    const tMontee = R.forceSaut / R.gravite;
+    const tMontee = R.forceSaut / P.g;
     const restant = Math.max(0, HAUTEUR_SAUT - Math.max(0, monte));
-    const tDescente = Math.sqrt(2 * restant / (R.gravite * R.graviteChute));
+    const tDescente = Math.sqrt(2 * restant / (P.g * R.graviteChute));
     const budget = R.vitesseMarche * (tMontee + tDescente) * 0.9;   // 10 % de marge
     return ecart <= budget;
   };
@@ -353,9 +369,10 @@ function analyser(id) {
 
 /* --- Rapport -------------------------------------------------------------- */
 
-console.log('Saut : ' + Math.round(HAUTEUR_SAUT) + ' px de haut, ' +
-            Math.round(PORTEE_MARCHE) + ' px de portee au pas, ' +
-            Math.round(PORTEE_COURSE) + ' en courant.\n');
+console.log('Saut sur Terre : ' + Math.round(TERRE.hauteur) + ' px de haut, ' +
+            Math.round(TERRE.marche) + ' px de portee au pas, ' +
+            Math.round(TERRE.course) + ' en courant.');
+console.log('(chaque niveau est analyse avec SA gravite)\n');
 
 let defauts = 0;
 for (const id of Object.keys(bac.NIVEAUX)) {

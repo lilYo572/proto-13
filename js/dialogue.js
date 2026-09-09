@@ -210,6 +210,95 @@ function fondDialogue(nom) {
     return;
   }
 
+  /* LA FUSEE, sur son pas de tir improvise derriere la base. Dessinee en
+     primitives comme les autres fonds : une illustration de plus pour une
+     cinematique de sept repliques ne se justifie pas, et une fusee est
+     exactement le genre de forme que trois rectangles suffisent a raconter. */
+  if (nom === 'fusee') {
+    const g = ctx.createLinearGradient(0, 0, 0, HAUTEUR);
+    g.addColorStop(0, '#101a2e'); g.addColorStop(1, '#3a3448');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+
+    // Quelques etoiles : on est dehors, et il fait nuit.
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    for (let i = 0; i < 40; i++) {
+      const sx = (i * 97) % LARGEUR, sy = (i * 53) % 150;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+
+    const cx = LARGEUR / 2 + 40, base = 270;
+    // Portique
+    ctx.fillStyle = '#2a2f3e';
+    ctx.fillRect(cx - 62, base - 150, 8, 150);
+    for (let k = 0; k < 5; k++) ctx.fillRect(cx - 62, base - 140 + k * 28, 30, 4);
+    // Corps
+    ctx.fillStyle = '#c9cede';
+    ctx.fillRect(cx - 17, base - 132, 34, 132);
+    ctx.fillStyle = '#8f96a8';
+    ctx.fillRect(cx + 6, base - 132, 11, 132);
+    // Coiffe
+    ctx.fillStyle = '#d8483c';
+    ctx.beginPath();
+    ctx.moveTo(cx - 17, base - 132); ctx.lineTo(cx, base - 176);
+    ctx.lineTo(cx + 17, base - 132); ctx.closePath(); ctx.fill();
+    // Ailerons
+    ctx.fillStyle = '#d8483c';
+    ctx.beginPath();
+    ctx.moveTo(cx - 17, base - 34); ctx.lineTo(cx - 34, base); ctx.lineTo(cx - 17, base);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 17, base - 34); ctx.lineTo(cx + 34, base); ctx.lineTo(cx + 17, base);
+    ctx.closePath(); ctx.fill();
+    // Hublot, et une bande de peinture faite a la main
+    ctx.fillStyle = '#6fd0e8';
+    ctx.beginPath(); ctx.arc(cx - 3, base - 104, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8b62c';
+    ctx.fillRect(cx - 17, base - 66, 34, 5);
+    // Vapeur au pied
+    ctx.fillStyle = 'rgba(220,230,255,.16)';
+    for (let k = 0; k < 6; k++) {
+      const r = 12 + ((k * 17) % 22) + Math.sin(t * 2 + k) * 3;
+      ctx.beginPath(); ctx.arc(cx - 46 + k * 22, base + 6, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#20242f';
+    ctx.fillRect(0, base, LARGEUR, HAUTEUR - base);
+    return;
+  }
+
+  /* LA LUNE, vue depuis le hublot. Le meme gris que le decor du niveau 9 :
+     l'annonce et l'arrivee doivent montrer le meme endroit. */
+  if (nom === 'lune') {
+    ctx.fillStyle = '#03050d'; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    for (let i = 0; i < 70; i++) {
+      const sx = (i * 131) % LARGEUR, sy = (i * 79) % HAUTEUR;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+    // Le disque, en bas a droite, plus gros que l'ecran ne le laisse voir.
+    const lx = LARGEUR * 0.62, ly = 300, lr = 150;
+    ctx.fillStyle = '#7a8296';
+    ctx.beginPath(); ctx.arc(lx, ly, lr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#646c80';
+    for (let k = 0; k < 12; k++) {
+      const a = k * 1.9, d = (k % 4) * 32 + 22;
+      const px = lx + Math.cos(a) * d, py = ly + Math.sin(a) * d * 0.8;
+      if (py > ly - lr + 10) {
+        ctx.beginPath(); ctx.arc(px, py, 8 + (k % 3) * 6, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.fillStyle = 'rgba(4,6,14,.35)';
+    ctx.beginPath(); ctx.arc(lx + 46, ly - 16, lr, 0, Math.PI * 2); ctx.fill();
+    // La fusee, minuscule, qui traverse.
+    const fx = 90 + ((t * 26) % (LARGEUR + 120)) - 60;
+    ctx.fillStyle = '#e6e8f0';
+    ctx.fillRect(Math.round(fx), 116, 12, 4);
+    ctx.fillStyle = '#d8483c';
+    ctx.fillRect(Math.round(fx) + 12, 116, 4, 4);
+    ctx.fillStyle = 'rgba(255,180,90,.6)';
+    ctx.fillRect(Math.round(fx) - 9, 117, 9, 2);
+    return;
+  }
+
   ctx.fillStyle = '#0a0c14';
   ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
 }
@@ -393,6 +482,45 @@ const DIALOGUE_HUB = [
 ];
 
 /* -----------------------------------------------------------------------------
+   LA CINEMATIQUE DE LA FUSEE
+
+   Elle se joue UNE FOIS, juste avant le premier depart pour le niveau 9, et
+   nulle part ailleurs — ni au retour, ni en rejouant le niveau, ni depuis le
+   panneau de teleportation. Le drapeau `partie.fusee` s'en charge.
+
+   Pourquoi elle existe. La derniere piece de l'appareil est annoncee depuis le
+   niveau 3 comme etant « loin, tres loin — il faudra une fusee ». Passer de la
+   carte de la base a un sol lunaire sans un mot ferait de ce voyage un simple
+   changement de decor. Sept repliques suffisent a en faire un depart.
+
+   Elle est courte, et l'on peut la passer : une cinematique qu'on subit une
+   seconde fois est une cinematique de trop.
+-------------------------------------------------------------------------- */
+
+const DIALOGUE_FUSEE = [
+  { qui: 'braddy', fond: 'fusee',
+    texte: 'BRAD. VIENS DERRIÈRE LA BASE. J\'AI CONSTRUIT QUELQUE CHOSE.' },
+  { qui: 'brad', fond: 'fusee',
+    texte: 'C\'est une fusée.' },
+  { qui: 'braddy', fond: 'fusee',
+    texte: 'C\'EST UNE FUSÉE. La dernière pièce de l\'appareil n\'est pas sur cette planète. Elle est sur la lune. La lune de ce monde-ci, pas la nôtre — je précise, parce que la différence va compter.' },
+  { qui: 'brad', fond: 'fusee',
+    texte: 'Et elle compte comment, exactement ?' },
+  { qui: 'braddy', fond: 'lune',
+    texte: 'ELLE PÈSE MOINS. Tu sauteras deux fois plus haut et tu retomberas deux fois plus lentement. Ce n\'est pas un cadeau : tout le reste tombe aussi lentement que toi.' },
+  { qui: 'brad', fond: 'lune',
+    texte: 'Tout le reste, c\'est-à-dire.' },
+  { qui: 'braddy', fond: 'lune',
+    texte: 'DES CAILLOUX. Beaucoup. Le champ d\'astéroïdes bombarde la face nord en permanence. Reste loin de ce qui est marqué au sol — ou fais-y venir quelqu\'un d\'autre. Je te laisse choisir, tu es adulte.' },
+  { qui: 'brad', fond: 'lune',
+    texte: 'Tu m\'envoies sur une lune bombardée pour aller chercher un appareil à raclette.' },
+  { qui: 'braddy', fond: 'lune',
+    texte: 'JE T\'ENVOIE SUR UNE LUNE BOMBARDÉE POUR ALLER CHERCHER LA DERNIÈRE PIÈCE. L\'appareil à raclette n\'est qu\'un moyen. Bon vol, Brad. Ne casse pas la fusée. Je le précise parce que statistiquement…' },
+  { qui: 'brad', fond: 'lune',
+    texte: 'Oui. J\'ai compris. J\'y vais.' },
+];
+
+/* -----------------------------------------------------------------------------
    REPLIQUES DU BRADDY3000
 
    Deux usages : quand on lui parle dans la base (touche E ou clic), et quand
@@ -423,10 +551,26 @@ const REPLIQUES_PAR_NIVEAU = {
     'Le grand volant s\'est divisé trois fois et tu l\'as retrouvé trois fois. Je suis presque ému.',
     'J\'ai compté les portraits. Quarante et un. Aucun ne représente quelqu\'un de sympathique.',
   ],
+  /* Attention a la NUMEROTATION. Ces trois repliques parlaient du complexe et
+     etaient rangees sous 'niveau7' : depuis que le complexe est le huitieme
+     niveau et que Paris occupe le septieme, les laisser la ferait commenter
+     des lasers au retour d'une promenade sur les toits. */
   'niveau7': [
+    'Paris. Les vrais toits, la vraie tour, et des Serra dessus. Je ne commente pas.',
+    'Tu as marché sur du zinc pendant vingt minutes. C\'est plus parisien que tout le reste.',
+    'J\'ai compté onze cheminées identiques. Kirby 67 a copié-collé un quartier entier.',
+  ],
+  'niveau8': [
     'Un complexe scientifique. Personne dedans. Les lasers, eux, travaillaient encore.',
     'J\'ai lu les écrans en passant. C\'était des tableurs. Des tableurs partout.',
-    'Le réacteur pulse toutes les sept secondes. Je le sais parce que je n\'ai pas pu m\'en empêcher.',
+    'Le tokamak pulse toutes les sept secondes. Je le sais parce que je n\'ai pas pu m\'en empêcher.',
+    'Une chambre de confinement magnétique, dans un monde au Serrano. Quelqu\'un, là-bas, a de l\'ambition.',
+  ],
+  'niveau9': [
+    'Tu es allé sur la lune. Je tiens à le noter, parce que personne d\'autre ne le fera.',
+    'La gravité y était à 55 %. Tes sauts étaient magnifiques. Tes atterrissages, moins.',
+    'Le champ d\'astéroïdes n\'a pas cessé une seconde. Il ne cessera pas. C\'est son travail.',
+    'Tu as fait tomber un caillou de trois tonnes sur quelqu\'un. Je note « résolution créative ».',
   ],
 };
 
@@ -512,9 +656,16 @@ function repliqueBraddy() {
     conseils.push('Frappe-le et il te fond dessus. C\'est agaçant, mais c\'est prévisible — donc esquivable.');
     conseils.push('Les Spectres sont verts. Les copies sont violettes. Si tu retiens ça, tu as gagné la moitié du combat.');
   }
-  if (typeof niveauDebloque === 'function' && niveauDebloque('niveau7')) {
+  if (typeof niveauDebloque === 'function' && niveauDebloque('niveau8')) {
     conseils.push('Les barrières hautes s\'attendent, les basses se sautent. Regarde où elles s\'arrêtent.');
     conseils.push('Le voyant est vert avant que la barrière ne s\'éteigne. C\'est ton feu de circulation.');
+  }
+  if (typeof niveauDebloque === 'function' && niveauDebloque('niveau9')) {
+    conseils.push('Sur la lune, freine plus tôt. Tu tombes lentement, mais tu tombes quand même.');
+    conseils.push('Le Balistique encaisse tout ce que tu lui donnes. Ce n\'est pas toi qui dois le frapper.');
+    conseils.push('Le cercle au sol se pose là où TU es. Reste dedans, laisse-le venir, écarte-toi.');
+    conseils.push('Un astéroïde ne touche que ce qui est près du sol. Sauter est une esquive — et il reste dessous.');
+    conseils.push('Quand il est assommé, sa coque ne compte plus. Tu as trois secondes, pas quatre.');
   }
 
   const absurdes = [

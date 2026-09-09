@@ -1475,3 +1475,189 @@ section repart maintenant d'un Brad nu.
 Un défaut d'affichage trouvé par une capture : le libellé de la résistance
 passait par-dessus la colonne « actuel : … ». Les deux textes sont désormais
 bornés, et un test refuse tout libellé trop long pour sa colonne.
+
+
+---
+
+# Prototype 15 — Paris, le tokamak, la Lune et le Serra-Balistique
+
+## La renumérotation
+
+Le complexe scientifique était le niveau 7 et jouait la musique n° 7. Il joue
+désormais la n° 8, et il **est** le niveau 8. Le niveau 7 devient **Paris**, et
+garde la musique n° 7.
+
+Concrètement : `niveaux/niveau7.js` a été entièrement réécrit (les toits de
+Paris), `niveaux/niveau8.js` reprend le complexe. Tout ce qui parlait du
+niveau 7 a suivi — les répliques du BRADDY3000 au retour de mission, ses
+conseils sur les barrières laser, la suite de tests. Deux vérifications
+existent maintenant exprès pour ce genre de décalage : elles refusent un
+niveau 7 qui aurait des lasers, et un niveau 8 qui ne jouerait pas la n° 8.
+
+**Deux musiques manquent encore** : `niveau8` et `niveau9`. Elles ne m'ont
+jamais été transmises. Le jeu les demande sous les noms `assets/audio/niveau8`
+et `assets/audio/niveau9` ; tant qu'elles ne sont pas là, ces deux niveaux se
+jouent en silence et le menu principal affiche « 2 pistes audio introuvables ».
+Il suffit de déposer les fichiers sous ces noms.
+
+## Le réacteur qu'on ne voyait pas — la vraie cause
+
+Tu avais signalé qu'en franchissant le sas de la deuxième zone du complexe, on
+ne percevait pas le réacteur. Ce n'était pas une question d'éclairage.
+
+`dessinerTuyaux()` **repeignait l'écran entier** avant de dessiner ses tuyaux.
+Elle servait à deux endroits opposés : comme première couche, où c'est
+exactement ce qu'il faut, et comme couche avant, par-dessus une machine déjà
+dessinée. La salle appelait donc `dessinerReacteur(...)` puis
+`dessinerTuyaux(...)`, et la seconde effaçait la première. Le réacteur était
+dessiné à chaque image, puis recouvert avant d'être montré. Il n'a jamais
+manqué de lumière : il manquait d'exister à l'écran.
+
+La fonction distingue désormais ses deux usages. En couche avant, elle ne pose
+aucun fond et ses tuyaux passent en silhouette sombre — ce qui est de toute
+façon ce qu'on voit d'un tuyau placé devant une machine allumée.
+
+À la place du réacteur, la salle abrite maintenant un **tokamak** : la chambre
+torique d'un réacteur à fusion, avec son plasma qui pulse et ses dix bobines de
+champ. Clin d'œil à CORE, et une forme qu'on reconnaît d'un coup d'œil.
+
+## Paris
+
+Deux zones : les toits de zinc à l'aube, puis au-dessus des cheminées en plein
+jour. Le tracé est le plus **vertical** du jeu — on monte autant qu'on avance.
+Les échafaudages sont des barres mobiles, les balcons des plateformes
+traversantes : aucune mécanique nouvelle, et c'est délibéré. Les quatre niveaux
+précédents en ont chacun introduit une ; en empiler une cinquième ici ferait un
+jeu qui n'apprend plus rien au joueur, il l'assomme.
+
+La Tour Eiffel est posée une seule fois, jamais répétée. Elle a demandé trois
+corrections, toutes du même genre :
+
+- elle était placée « à la tuile 132 » alors que les couches de fond ont leur
+  propre repère : elle ne serait entrée dans le cadre qu'à la tuile 750 d'un
+  niveau qui en compte 250. Elle était dessinée à chaque image, toujours hors
+  champ ;
+- son arche était creusée avec `destination-out`, qui efface **tout** ce qui a
+  déjà été dessiné : elle perçait un trou noir en forme d'arche dans le ciel.
+  Elle est maintenant un seul tracé rempli en `evenodd`, comme l'anneau du
+  tokamak ;
+- à 268 px son sommet sortait de l'écran, à 206 px elle passait sous la ligne
+  des toits. 240 px la font dépasser d'une vingtaine de pixels.
+
+## La cinématique de la fusée
+
+Elle se joue **une fois**, entre le choix de la mission sur la carte et le
+chargement du niveau 9, et nulle part ailleurs — ni au retour, ni en rejouant,
+ni depuis le panneau de téléportation. Le BRADDY3000 a construit une fusée
+derrière la base ; il prévient que la lune du monde parallèle pèse moins, et
+qu'il y tombe des cailloux. Deux fonds dessinés en primitives : le pas de tir,
+et la Lune vue de l'espace.
+
+Le fil était posé depuis le niveau 3 : « la dernière pièce est loin, très loin.
+Il faudra une fusée, et je préfère t'en parler plus tard. »
+
+## Le niveau 9 : la Lune
+
+`gravite: 0.55`, un **multiplicateur** du réglage global — le curseur
+« Gravité » du panneau continue de piloter tout le jeu, et la Lune reste légère
+quel que soit le réglage. Tout ce qui tombe le subit : Brad, les Serra, les
+boules, les pièces. Une lune où seul le héros flotte se lirait comme un bug.
+
+|                    | Terre  | Lune   |
+|--------------------|--------|--------|
+| hauteur de saut    | 74 px  | 134 px |
+| portée au pas      | 94 px  | 171 px |
+| portée en course   | 157 px | 285 px |
+
+Le tracé suit ces chiffres au lieu de recopier ceux des huit niveaux
+précédents : trous de six à sept tuiles au lieu de quatre, plateformes à quatre
+puis huit rangées du sol. On saute exactement autant qu'avant ; c'est le décor
+qui a grandi autour du saut. Le vide le plus large fait sept tuiles, soit moins
+que la portée **au pas** : aucune course n'est jamais obligatoire.
+
+Le vérificateur de niveaux calcule désormais ces portées **par niveau**, à
+partir de la gravité déclarée. Lui appliquer la gravité terrestre condamnerait
+des plateformes parfaitement atteignables et, pire, laisserait passer des trous
+infranchissables.
+
+La Terre est visible au fond, et elle a demandé la même correction que la Tour
+Eiffel : posée à 1400 px d'un monde qui en fait 6624, elle n'entrait jamais
+dans le cadre.
+
+## Le mini-boss : le Serra-Balistique
+
+Un Serra-Lanceur nourri, avec des jambes. **Troisième genre de combat** du jeu
+(`genre: 'asteroides'`), à côté du blindage du Colosse et de la duplication du
+Séraphin. Les deux autres n'ont pas été touchés.
+
+Le principe en une phrase : **les poings ne suffisent pas, c'est le ciel qui
+frappe**. Le champ d'astéroïdes bombarde la salle en continu, et chaque impact
+est annoncé une seconde et demie à l'avance par un cercle au sol **posé là où
+se trouve Brad**. D'où le combat : rester sur le cercle, laisser le Balistique
+venir — il marche vers Brad à 67 px/s, contre 150 au pas — et s'écarter au
+dernier instant.
+
+Ce que cette construction garantit :
+
+- **aucun hasard.** Le marquage suit Brad ; c'est lui qui choisit où tombera le
+  prochain rocher. Rater l'appât est une erreur de placement, pas un tirage ;
+- **deux esquives.** S'écarter, ou sauter — un astéroïde ne touche que ce qui
+  est près du sol, et le saut lunaire monte à 134 px. Les deux laissent le boss
+  dessous ;
+- **aucun blocage.** Sa coque n'est pas une invulnérabilité : elle ne laisse
+  passer qu'un quart des dégâts, donc le joueur qui n'a rien compris finit par
+  gagner au poing — en cent vingt coups. Personne ne le fait par accident, et
+  personne n'est enfermé ;
+- **une fenêtre de dégâts propre.** Un impact l'assomme trois secondes, et la
+  pluie s'arrête pendant ce temps. On ne lui fait pas payer sa récompense.
+
+La boule renvoyée, qui couche un Lanceur ordinaire d'un seul coup, est plafonnée
+sur lui : sa parade familière marche encore, elle ne suffit plus.
+
+## Trois bugs trouvés par les tests, pas par la relecture
+
+**Le modulo négatif.** `rangeeDeFond()` numérote les motifs de décor par leur
+indice dans le monde, et cet indice est **négatif** au début d'un niveau. Or en
+JavaScript `(-7) % 4` vaut `-3`. Trente et une variations de décor renvoyaient
+donc des valeurs négatives sur les premiers écrans — et sur la Lune, un rayon
+de cratère de −6 px, que `ctx.ellipse()` refuse net : le rendu du niveau 9
+s'arrêtait sur une exception dès la première image. Toutes passent maintenant
+par `restePositif()`. (Elle ne s'appelle pas `motif` : trois fonctions du
+fichier déclarent déjà un tableau local de ce nom, et l'appel s'y résolvait.)
+
+**`undefined <= 0` vaut faux.** `assomme` n'était posé que par les combats qui
+s'en servent, et valait `undefined` partout ailleurs. Toute condition écrite
+« tant qu'il n'est pas assommé » était donc ignorée sur un ennemi qui ne
+l'avait jamais été — c'est ce qui empêchait la pluie d'astéroïdes de
+**commencer**. Le champ est maintenant initialisé à zéro à la création.
+
+**Le rebond sans fin.** Sauter sur un Serra-Lanceur ne l'écrase pas : Brad
+rebondit et se fait pousser de côté. Le robot d'exploration, lui, repousse
+« droite » à l'image suivante, retombe au même endroit, rebondit encore — et
+sur la Lune, où un rebond dure plus d'une demi-seconde, la boucle ne s'arrête
+jamais. Il est resté six minutes à la tuile 147 d'un niveau que l'autre robot
+traverse en 56 secondes. **Le défaut était dans le robot**, pas dans le
+niveau : un joueur lâche la touche. On le lui a appris.
+
+## Vérification
+
+**154 vérifications**, 0 échec. Vingt-six sont nouvelles et portent sur la
+Lune : la gravité mesurée en faisant sauter Brad pour de vrai sur les deux
+planètes, le marquage posé sous Brad, le préavis d'une seconde et demie, l'appât
+qui coûte sept points de vie au boss et zéro à Brad, les deux esquives, les deux
+bords de la coque, la pluie qui se tait pendant l'assommage, la fuite possible,
+et la cinématique qui ne se rejoue jamais.
+
+Les 404 des deux musiques manquantes sont désormais **jugés séparément** : la
+console disait « Failed to load resource » quatre fois sans dire laquelle, et
+on ne pouvait pas distinguer un script absent d'une musique attendue. Le test
+relève maintenant l'adresse de chaque ressource introuvable et n'accepte que
+`niveau8` et `niveau9`.
+
+Le vérificateur de géométrie passe sur les onze niveaux, avec la gravité de
+chacun : aucun défaut.
+
+## À faire ensuite
+
+Le niveau 10 : le manoir de Kirby 67 et le combat final. C'est le dernier, et
+c'est le seul qui reste.

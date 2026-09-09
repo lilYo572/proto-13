@@ -177,7 +177,7 @@ function majBrad(dt) {
   if (brad.sautEnCours && (!entrees.saut || brad.vy >= 0)) brad.sautEnCours = false;
 
   brad.rebond = Math.max(0, brad.rebond - dt);
-  let g = R.gravite;
+  let g = graviteCourante();
   if (brad.vy > 0) g *= R.graviteChute;
   // La gravite renforcee du bouton relache ne doit pas s'appliquer a une
   // impulsion que le joueur n'a pas donnee : sans cette exception, le
@@ -337,6 +337,8 @@ const CONSEILS = {
   'Serra-Glacon': "Il patine. Laisse-le dépasser, il mettra un moment à revenir.",
   'Serra-Spectre': "Vert, et rapide. Il ne se pose jamais : attrape-le en l'air.",
   'Serra-Seraphin': "Il encaisse presque tout. Attends qu'il se divise, et ne le quitte pas des yeux.",
+  'Serra-Balistique': "Ta force ne lui fera rien. Attire-le sous un impact.",
+  'astéroïde': "Le cercle au sol dit où ça tombe. Ce n'était pas une décoration.",
   'le vide': "Le vide, Brad. Le vide.",
 };
 
@@ -537,6 +539,38 @@ const TYPES_ENNEMI = {
   'Serra-Spectre':  { w: 24, h: 28, pv: 1, vitesse: 1.15, degats: 1, shy: 1.4, ecrasable: true,
                       sensNatif: -1, sprite: 'Serra-Volant', echelle: 1.05, vole: true,
                       teinte: 'rgba(110,255,190,.55)' },
+
+  /* -------------------------------------------------------------------------
+     LE MINI-BOSS DU NIVEAU 9 — LE SERRA-BALISTIQUE
+
+     Un Serra-Lanceur nourri, posé sur la Lune. Il garde de sa famille la
+     cadence de tir et la coque qui encaisse ; il y ajoute la seule chose qu'un
+     Lanceur n'a jamais eue : des jambes.
+
+     POURQUOI IL N'EST PAS `invulnerable`. Le Lanceur ordinaire l'est, et sa
+     parade — lui renvoyer sa boule — le couche d'un coup. Reprendre cette
+     regle telle quelle ici donnerait un mini-boss qu'un seul renvoi termine.
+     A l'inverse, une invulnerabilite stricte enfermerait le joueur qui n'a pas
+     compris la pluie d'asteroides dans un combat sans issue.
+
+     `resistance: 0.25` tient les deux bouts : quatre coups valent un point de
+     vie, ce qui laisse une sortie a l'acharnement (trente points de vie,
+     environ cent-vingt coups — personne ne le fait par accident) tout en
+     rendant l'asteroide, a sept points par impact, incomparablement meilleur.
+     Le plafond de blesserEnnemi() s'applique aussi a la boule renvoyee : elle
+     ne peut plus le coucher d'un seul renvoi.
+  ------------------------------------------------------------------------- */
+  'Serra-Balistique': { w: 46, h: 60, pv: 30, vitesse: 1.6, degats: 2, shy: 7,
+                        ecrasable: false, sensNatif: 1,
+                        sprite: 'Serra-Lanceur', echelle: 1.9,
+                        teinte: 'rgba(150,196,255,.42)',
+                        boss: true, resistance: 0.25,
+                        // La coque et le message qui l'accompagne : le joueur
+                        // doit comprendre que ce n'est pas « raté », c'est
+                        // « pas par là ».
+                        coqueRGB: '150,196,255',
+                        messageResistance: 'sa coque tient — regarde le ciel',
+                        cadence: 2.9, pilotage: 'balistique' },
 };
 
 /* Impulsion d'un ennemi qui franchit un trou, et distance maximale qu'il
@@ -586,6 +620,13 @@ function creerEnnemi(depart, index) {
     coince: 0,
     phase: depart.x * 0.7,               // dephasage pour que tous ne bougent pas ensemble
     ecrase: 1,
+    /* `assomme` DOIT exister des la creation. Il n'etait pose que par les
+       combats qui s'en servent, et valait donc `undefined` partout ailleurs :
+       or `undefined <= 0` est FAUX en JavaScript. Toute condition ecrite
+       « tant qu'il n'est pas assomme » etait ainsi ignoree sur un ennemi qui
+       ne l'avait jamais ete — c'est ce qui empechait la pluie d'asteroides du
+       niveau 9 de commencer. */
+    assomme: 0,
     rechargeTir: 1.0,
     // Tempo du Serra-Samba. Decale par la position de depart : deux Sambas
     // voisins qui repartiraient exactement ensemble se liraient comme un seul
@@ -606,7 +647,11 @@ function reinitialiserEnnemis(complet) {
   ramassages.length = 0;
 }
 
-function blesserEnnemi(e, degats, sensPoussee, ignoreInvulnerabilite) {
+/* `ignoreResistance` : reserve a ce qui ne vient PAS de Brad. Un asteroide de
+   la Lune n'est pas un coup de poing plus fort, c'est un autre canal de
+   degats — la coque du Balistique ne le concerne pas, sans quoi la seule
+   mecanique du combat serait divisee par quatre comme le reste. */
+function blesserEnnemi(e, degats, sensPoussee, ignoreInvulnerabilite, ignoreResistance) {
   if (e.etat === 'mort') return;
 
   /* Une copie du Seraphin ne se blesse pas : on la DESIGNE. Toucher la bonne
@@ -624,7 +669,7 @@ function blesserEnnemi(e, degats, sensPoussee, ignoreInvulnerabilite) {
      invulnerable) ou 1 (la resistance ne servirait a rien). Ici trois coups
      valent un point, exactement. La resistance tombe pendant l'assommage :
      c'est la recompense du bonneteau resolu. */
-  if (e.t.resistance !== undefined) {
+  if (e.t.resistance !== undefined && !ignoreResistance) {
     /* Plafond par coup, AVANT la fraction. Sans lui, une boule de Serrano
        renvoyee (999 degats, invulnerabilite ignoree) couchait le boss d'un
        seul renvoi et tout le combat s'evaporait. Rien ne vaut plus de deux
@@ -637,7 +682,9 @@ function blesserEnnemi(e, degats, sensPoussee, ignoreInvulnerabilite) {
       if (passe <= 0) {
         e.flash = 0.12;
         audio.bruit('blinde');
-        texteFlottant(e.x + e.w / 2, e.y, 'il encaisse', '#c8a0ff');
+        texteFlottant(e.x + e.w / 2, e.y,
+                      e.t.messageResistance || 'il encaisse',
+                      'rgba(' + (e.t.coqueRGB || '200,160,255') + ',1)');
         return;
       }
       degats = passe;
@@ -887,7 +934,7 @@ function majTerrestre(e, dt, dx) {
     e.vx = cible;
   }
 
-  e.vy = Math.min(R.chuteMax, e.vy + R.gravite * dt);
+  e.vy = Math.min(R.chuteMax, e.vy + graviteCourante() * dt);
 
   // Deplacement horizontal
   e.x += e.vx * dt;
@@ -1013,7 +1060,7 @@ function majVolant(e, dt, dx, dy) {
 
 function majLanceur(e, dt, dx, dy) {
   if (!e.dort) e.sens = Math.sign(dx) || e.sens;
-  e.vy = Math.min(R.chuteMax, e.vy + R.gravite * dt);
+  e.vy = Math.min(R.chuteMax, e.vy + graviteCourante() * dt);
   e.y += e.vy * dt;
   for (const s of solides) {
     if (!chevauche(e, s)) continue;
@@ -1155,7 +1202,7 @@ function majBoules(dt) {
     // Le tir de l'ennemi decrit une cloche ; le renvoi de Brad part droit
     // devant lui. Une trajectoire tendue et previsible fait du renvoi une
     // vraie riposte plutot qu'un pari sur l'angle.
-    b.vy = Math.min(R.chuteMax, b.vy + R.gravite * (b.aBrad ? 0 : 0.85) * dt);
+    b.vy = Math.min(R.chuteMax, b.vy + graviteCourante() * (b.aBrad ? 0 : 0.85) * dt);
     b.x += b.vx * dt;
     b.y += b.vy * dt;
 
@@ -1220,7 +1267,7 @@ function majRamassages(dt) {
   for (const r of ramassages) {
     r.vie -= dt;
     r.phase += dt * 7;
-    r.vy = Math.min(500, r.vy + R.gravite * 0.9 * dt);
+    r.vy = Math.min(500, r.vy + graviteCourante() * 0.9 * dt);
     r.x += r.vx * dt;
     r.y += r.vy * dt;
 

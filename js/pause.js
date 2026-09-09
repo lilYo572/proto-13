@@ -180,6 +180,10 @@ const CONSEILS_CHARGEMENT = [
   'Toucher une fausse copie ne coûte rien, sauf le mélange qui repart de plus belle.',
   'Les copies du Séraphin sont violettes, ses renforts sont verts. Ils ne se croisent jamais.',
   'Une barrière laser haute s\'attend. Une barrière basse se saute.',
+  'Sur la lune, la gravité tombe à 55 %. Tes sauts montent presque deux fois plus haut.',
+  'Le cercle orange au sol marque un impact. Il se pose là où tu te trouves.',
+  'Le Serra-Balistique ne craint pas tes poings. Il craint ce qui tombe du ciel.',
+  'Un astéroïde ne frappe que près du sol : sauter au bon moment est une esquive.',
 ];
 
 const chargement = {

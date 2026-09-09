@@ -171,6 +171,7 @@ const partie = {
   arcadeParties: 0,
   entrainements: 0,             // passages au camp — ne rapporte rien d'autre
   hubVu: false,                 // le dialogue de decouverte de la base a deja eu lieu
+  fusee: false,                 // la cinematique du depart pour la lune a deja eu lieu
   piste: 'menu',                // morceau choisi au jukebox
   codes: [],                    // codes du jukebox deja entres
   objets: [],                   // pieces de l'appareil a raclette recuperees
@@ -272,6 +273,7 @@ function chargerPartie() {
     }
     if (typeof brut.arcadeJour === 'string') partie.arcadeJour = brut.arcadeJour;
     if (typeof brut.hubVu === 'boolean') partie.hubVu = brut.hubVu;
+    if (typeof brut.fusee === 'boolean') partie.fusee = brut.fusee;
     if (typeof brut.piste === 'string' && PISTES_JUKEBOX.some(p => p.cle === brut.piste)) {
       partie.piste = brut.piste;
     }
@@ -314,6 +316,7 @@ function effacerPartie() {
   partie.arcadeParties = 0;
   partie.entrainements = 0;
   partie.hubVu = false;
+  partie.fusee = false;
   partie.objets = [];
   partie.bossVaincus = [];
   partie.piste = 'menu';

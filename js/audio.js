@@ -328,6 +328,11 @@ const audio = {
       // se confond avec aucun autre son du jeu.
       case 'bouclier': this.ton({ de: 880, vers: 1320, duree: 0.1, forme: 'triangle', gain: 0.18 });
                       this.ton({ de: 1320, vers: 1760, duree: 0.16, forme: 'triangle', gain: 0.12, retard: 0.07 }); break;
+      /* L'alerte d'astéroïde : un sifflement qui DESCEND, doublé d'un
+         grondement sourd. Il ne ressemble a rien d'autre dans le jeu, ce qui
+         est le minimum pour un signal qui annonce un impact. */
+      case 'asteroide': this.ton({ de: 900, vers: 200, duree: 1.3, forme: 'sawtooth', gain: 0.1 });
+                      this.souffle({ duree: 1.2, gain: 0.09, filtre: 420 }); break;
       case 'craque':  this.souffle({ duree: 0.09, gain: 0.13, filtre: 3200 });
                       this.ton({ de: 260, vers: 90, duree: 0.22, forme: 'triangle', gain: 0.13 }); break;
       case 'menu':    this.ton({ de: 620, vers: 620, duree: 0.05, forme: 'square', gain: 0.1 }); break;

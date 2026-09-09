@@ -1131,9 +1131,7 @@ function dessinerCarte() {
      vitrine de la base. Les deux ne pouvaient pas etre vraies ; celle-ci suit
      les donnees. */
   ctx.fillStyle = 'rgba(255,255,255,.25)';
-  ctx.fillText('À venir : niveau 8 · l\'espace (9, l\'appareil à raclette) · ' +
-               'le manoir de Kirby 67 et le combat final (10)',
-               68, bas + 20);
+  ctx.fillText('À venir : le manoir de Kirby 67 et le combat final (10)', 68, bas + 20);
 
   ctx.fillStyle = 'rgba(255,255,255,.3)';
   ctx.fillText('↑ ↓ choisir  ·  Entrée partir en mission  ·  Échap sortir', 56, HAUTEUR - 33);
@@ -1146,5 +1144,20 @@ function lancerNiveauCourant() {
     return;
   }
   audio.bruit('valider');
+
+  /* LE DEPART POUR LA LUNE.
+
+     La cinematique de la fusee s'intercale ici, et seulement ici : entre le
+     choix sur la carte et le chargement du niveau. Une seule fois par partie
+     — `partie.fusee` est ecrit avant meme que le dialogue ne commence, pour
+     qu'un joueur qui le passe ne le revoie pas non plus. */
+  if (id === 'niveau9' && !partie.fusee) {
+    partie.fusee = true;
+    enregistrerPartie();
+    audio.arreterMusique(0.6);
+    lancerDialogue(DIALOGUE_FUSEE, () => preparerNiveau('niveau9'));
+    return;
+  }
+
   preparerNiveau(id);
 }

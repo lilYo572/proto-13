@@ -223,8 +223,23 @@ function fond() {
       dessinerLabo(0.38, 300, z.pres);
       break;
     case 'reacteur':
-      dessinerReacteur(0.16, 300, z.loin);
-      dessinerTuyaux(0.4, z.pres);
+      dessinerTuyaux(0.16, z.loin);
+      dessinerReacteur(0.3, 300, z.pres);
+      break;
+    case 'tokamak':
+      // Le tokamak occupe le fond, les tuyaux passent devant EN SILHOUETTE :
+      // la machine doit se voir en entier des l'entree dans la salle.
+      dessinerTokamak(0.14, 306, z.loin);
+      dessinerTuyaux(0.42, z.pres, true);
+      break;
+    case 'toits':
+      dessinerParis(0.1, 250, z.loin);
+      dessinerToits(0.36, 302, z.pres);
+      break;
+    case 'lune':
+      dessinerCielEtoile(120);
+      dessinerTerreAuLoin(0.06);
+      dessinerCrateres(0.34, 302, z.pres);
       break;
     default:
       dessinerTuyaux(0.22, z.loin);
@@ -236,7 +251,7 @@ function fond() {
    comme les tours, pour que le champ ne bouge jamais tout seul. */
 function dessinerTournesols(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 42)) {
-    const h = 54 + (((idx * 29) % 7) * 9);
+    const h = 54 + (restePositif(idx * 29, 7) * 9);
     const balancement = Math.sin(performance.now() / 1400 + idx * 0.7) * 3;
     // tige
     ctx.fillStyle = couleur;
@@ -294,7 +309,7 @@ function dessinerImmeubles(facteur, baseY, couleur, fenetres) {
     for (let fy = baseY - h + 12; fy < baseY - 12; fy += 20, rang++) {
       let col = 0;
       for (let fx = x + 8; fx < x + 64; fx += 18, col++) {
-        const allume = (((idx * 31 + col * 7 + rang * 13) % 11) + 11) % 11 < 4;
+        const allume = restePositif(idx * 31 + col * 7 + rang * 13, 11) < 4;
         ctx.fillStyle = allume ? 'rgba(255,214,140,.5)' : 'rgba(0,0,0,.24)';
         ctx.fillRect(fx, fy, 10, 12);
       }
@@ -318,7 +333,7 @@ function dessinerCour(facteur, baseY, couleur) {
       ctx.stroke();
     }
     // Corde a linge, avec le linge qui bouge un peu.
-    const yl = baseY - 104 - ((idx * 19) % 3) * 12;
+    const yl = baseY - 104 - restePositif(idx * 19, 3) * 12;
     ctx.strokeStyle = 'rgba(255,255,255,.13)';
     ctx.beginPath(); ctx.moveTo(x, yl); ctx.lineTo(x + 104, yl + 6); ctx.stroke();
     const couleurs = ['rgba(210,110,100,.4)', 'rgba(110,150,200,.4)', 'rgba(220,200,120,.4)'];
@@ -344,7 +359,7 @@ function dessinerMontagnes(facteur, baseY, couleur) {
   ctx.beginPath();
   ctx.moveTo(-200, HAUTEUR);
   for (const { idx, x } of rangeeDeFond(facteur, 190)) {
-    const h = 96 + (((idx * 37) % 5) * 26);
+    const h = 96 + (restePositif(idx * 37, 5) * 26);
     ctx.lineTo(x, baseY);
     ctx.lineTo(x + 95, baseY - h);
     ctx.lineTo(x + 190, baseY);
@@ -354,7 +369,7 @@ function dessinerMontagnes(facteur, baseY, couleur) {
   ctx.fill();
   // Neige sur les sommets les plus hauts.
   for (const { idx, x } of rangeeDeFond(facteur, 190)) {
-    const h = 96 + (((idx * 37) % 5) * 26);
+    const h = 96 + (restePositif(idx * 37, 5) * 26);
     if (h < 148) continue;
     ctx.fillStyle = 'rgba(255,255,255,.16)';
     ctx.beginPath();
@@ -370,7 +385,7 @@ function dessinerMontagnes(facteur, baseY, couleur) {
    dit « enchantee » sans avoir a l'ecrire sur un panneau. */
 function dessinerForet(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 46)) {
-    const h = 66 + ((idx * 23) % 6) * 12;
+    const h = 66 + restePositif(idx * 23, 6) * 12;
     ctx.fillStyle = 'rgba(60,42,30,.5)';
     ctx.fillRect(x + 14, baseY - 16, 6, 16);
     ctx.fillStyle = couleur;
@@ -387,7 +402,7 @@ function dessinerForet(facteur, baseY, couleur) {
   }
   for (const { idx, x } of rangeeDeFond(facteur * 1.5, 118)) {
     const t = performance.now() / 1000;
-    const ly = 140 + ((idx * 41) % 6) * 26 + Math.sin(t * 1.1 + idx) * 9;
+    const ly = 140 + restePositif(idx * 41, 6) * 26 + Math.sin(t * 1.1 + idx) * 9;
     const lx = x + Math.cos(t * 0.8 + idx * 2) * 12;
     const eclat = 0.3 + 0.35 * Math.sin(t * 3 + idx);
     ctx.fillStyle = 'rgba(190,255,190,' + Math.max(0, eclat).toFixed(2) + ')';
@@ -398,8 +413,8 @@ function dessinerForet(facteur, baseY, couleur) {
 /* Zone 2 : le bosquet profond, avec de grands champignons. */
 function dessinerChampignons(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 76)) {
-    const h = 40 + ((idx * 29) % 4) * 18;
-    const l = 22 + ((idx * 13) % 3) * 7;
+    const h = 40 + restePositif(idx * 29, 4) * 18;
+    const l = 22 + restePositif(idx * 13, 3) * 7;
     ctx.fillStyle = 'rgba(230,225,235,.22)';
     ctx.fillRect(x + 16 - 4, baseY - h, 8, h);
     ctx.fillStyle = couleur;
@@ -416,8 +431,8 @@ function dessinerChampignons(facteur, baseY, couleur) {
    suite comme « ici, on se bat ». */
 function dessinerMenhirs(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 82)) {
-    const h = 82 + ((idx * 31) % 4) * 22;
-    const l = 22 + ((idx * 17) % 3) * 6;
+    const h = 82 + restePositif(idx * 31, 4) * 22;
+    const l = 22 + restePositif(idx * 17, 3) * 6;
     ctx.fillStyle = couleur;
     ctx.beginPath();
     ctx.moveTo(x + 4, baseY);
@@ -453,7 +468,7 @@ function dessinerMenhirs(facteur, baseY, couleur) {
 function dessinerNeons(facteur, baseY, couleur) {
   const teintes = ['255,90,160', '110,220,255', '255,190,80', '160,255,140'];
   for (const { idx, x } of rangeeDeFond(facteur, 96)) {
-    const h = 96 + ((idx * 23) % 4) * 24;
+    const h = 96 + restePositif(idx * 23, 4) * 24;
     ctx.fillStyle = couleur;
     ctx.fillRect(x, baseY - h, 80, h + HAUTEUR);
     ctx.fillStyle = 'rgba(255,255,255,.06)';
@@ -478,7 +493,7 @@ function dessinerNeons(facteur, baseY, couleur) {
 function dessinerClub(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 92)) {
     // Pile d'enceintes
-    const h = 78 + ((idx * 41) % 3) * 26;
+    const h = 78 + restePositif(idx * 41, 3) * 26;
     ctx.fillStyle = couleur;
     ctx.fillRect(x + 6, baseY - h, 62, h + HAUTEUR);
     ctx.fillStyle = 'rgba(0,0,0,.32)';
@@ -539,7 +554,7 @@ function dessinerVilleHiver(facteur, baseY, couleur) {
     for (let fy = baseY - h + 14; fy < baseY - 14; fy += 22, rang++) {
       let col = 0;
       for (let fx = x + 8; fx < x + 60; fx += 17, col++) {
-        const allume = (((idx * 29 + col * 5 + rang * 11) % 9) + 9) % 9 < 5;
+        const allume = restePositif(idx * 29 + col * 5 + rang * 11, 9) < 5;
         ctx.fillStyle = allume ? 'rgba(255,206,132,.55)' : 'rgba(0,0,0,.28)';
         ctx.fillRect(fx, fy, 10, 13);
       }
@@ -550,7 +565,7 @@ function dessinerVilleHiver(facteur, baseY, couleur) {
 /* Le parc : des sapins charges de neige, une rangee serree. */
 function dessinerSapins(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 62)) {
-    const h = 84 + ((idx * 19) % 4) * 20;
+    const h = 84 + restePositif(idx * 19, 4) * 20;
     ctx.fillStyle = 'rgba(60,44,34,.8)';
     ctx.fillRect(x + 20, baseY - 18, 6, 18);
     for (let k = 0; k < 3; k++) {
@@ -591,7 +606,7 @@ function dessinerSapins(facteur, baseY, couleur) {
    dont l'etat depend du numero de la maison et du rang — jamais de la camera. */
 function dessinerManoir(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 210)) {
-    const h = 150 + ((idx * 17) % 3) * 22;
+    const h = 150 + restePositif(idx * 17, 3) * 22;
     ctx.fillStyle = couleur;
     ctx.fillRect(x + 20, baseY - h, 170, h + HAUTEUR);
     // Deux tours coiffees en pointe
@@ -609,7 +624,7 @@ function dessinerManoir(facteur, baseY, couleur) {
     for (let fy = baseY - h + 26; fy < baseY - 30; fy += 44, rang++) {
       let col = 0;
       for (let fx = x + 40; fx < x + 176; fx += 34, col++) {
-        const allume = (((idx * 13 + col * 7 + rang * 5) % 9) + 9) % 9 < 3;
+        const allume = restePositif(idx * 13 + col * 7 + rang * 5, 9) < 3;
         ctx.fillStyle = allume ? 'rgba(255,196,110,.4)' : 'rgba(0,0,0,.35)';
         ctx.fillRect(fx, fy, 16, 22);
         ctx.beginPath();
@@ -623,8 +638,8 @@ function dessinerManoir(facteur, baseY, couleur) {
 /* Le parc : des arbres morts, penches, sans une feuille. */
 function dessinerArbresMorts(facteur, baseY, couleur) {
   for (const { idx, x } of rangeeDeFond(facteur, 74)) {
-    const h = 92 + ((idx * 23) % 4) * 18;
-    const penche = (((idx * 31) % 5) - 2) * 3;
+    const h = 92 + restePositif(idx * 23, 4) * 18;
+    const penche = (restePositif(idx * 31, 5) - 2) * 3;
     ctx.strokeStyle = couleur;
     ctx.lineWidth = 5;
     ctx.beginPath();
@@ -669,7 +684,7 @@ function dessinerInterieurManoir(facteur, baseY, couleur, salleDeBal) {
       }
     } else {
       // Portrait, legerement de travers
-      const incl = (((idx * 19) % 5) - 2) * 0.02;
+      const incl = (restePositif(idx * 19, 5) - 2) * 0.02;
       ctx.save();
       ctx.translate(x + 60, baseY - 110);
       ctx.rotate(incl);
@@ -710,7 +725,7 @@ function dessinerInterieurManoir(facteur, baseY, couleur, salleDeBal) {
 function dessinerLabo(facteur, baseY, couleur) {
   const t = performance.now() / 1000;
   for (const { idx, x } of rangeeDeFond(facteur, 96)) {
-    const h = 118 + ((idx * 29) % 3) * 24;
+    const h = 118 + restePositif(idx * 29, 3) * 24;
     ctx.fillStyle = couleur;
     ctx.fillRect(x + 6, baseY - h, 80, h + HAUTEUR);
     ctx.fillStyle = 'rgba(255,255,255,.07)';
@@ -724,7 +739,7 @@ function dessinerLabo(facteur, baseY, couleur) {
       const p = 0.25 + 0.2 * Math.sin(t * 1.4 + idx * 0.8 + k);
       ctx.fillStyle = 'rgba(110,220,235,' + p.toFixed(2) + ')';
       for (let j = 0; j < 3; j++) {
-        ctx.fillRect(x + 18, ey + 4 + j * 6, 20 + ((idx * 7 + k * 5 + j * 3) % 34), 2);
+        ctx.fillRect(x + 18, ey + 4 + j * 6, 20 + restePositif(idx * 7 + k * 5 + j * 3, 34), 2);
       }
     }
     // Diodes de facade
@@ -768,6 +783,355 @@ function dessinerReacteur(facteur, baseY, couleur) {
   }
 }
 
+/* -----------------------------------------------------------------------------
+   NIVEAU 7 — les toits de Paris
+
+   Deux plans : les façades haussmanniennes au fond, les toits de zinc devant.
+   La Tour Eiffel n'est PAS repetee comme le reste du decor — il n'y en a
+   qu'une, posee a un endroit fixe du monde. Un Paris avec une tour tous les
+   quatre immeubles ne serait pas Paris, ce serait un motif.
+-------------------------------------------------------------------------- */
+
+/* OU SE TROUVE LA TOUR.
+
+   Attention au repere : ce nombre n'est PAS une position dans le monde, et
+   l'avoir cru en a fait une tour invisible. Les couches de fond defilent a
+   `cam.x * facteur` — 0,1 ici — dans un axe qui leur est propre. Poser la tour
+   a « la tuile 132 », soit 3168, la placait donc a 3168 px du bord de l'ecran
+   au depart, et elle n'entrait dans le cadre qu'a la tuile 750 d'un niveau qui
+   en compte 250. Elle etait dessinee a chaque image, toujours hors champ.
+
+   900 la fait apparaitre par la droite vers la tuile 113 — au debut de la
+   deuxieme zone, la ou le panneau en parle — puis glisser lentement vers le
+   centre jusqu'a la fin du niveau. Une seule tour, jamais repetee : un Paris
+   avec une tour tous les quatre immeubles ne serait pas Paris, ce serait un
+   motif. */
+const X_TOUR_EIFFEL = 900;
+
+function dessinerParis(facteur, baseY, couleur) {
+  /* LA TOUR PASSE EN PREMIER, et voilee.
+
+     Dessinee apres les immeubles, elle avait exactement leur couleur et se
+     posait devant eux : une tour de la meme taille qu'un toit, collee au
+     premier plan. En la posant AVANT, les immeubles lui coupent le pied — elle
+     est derriere la ville, ce qu'elle est — et un voile la recule encore.
+     C'est de la perspective atmospherique, et c'est ce qui fait qu'on la lit
+     comme lointaine plutot que comme un decor de plus. */
+  const tx = Math.round(X_TOUR_EIFFEL - cam.x * facteur);
+  if (tx > -160 && tx < LARGEUR + 160) {
+    ctx.save();
+    ctx.globalAlpha = 0.62;
+    dessinerTourEiffel(tx, baseY + 10, couleur);
+    ctx.restore();
+  }
+
+  for (const { idx, x } of rangeeDeFond(facteur, 92)) {
+    const h = 132 + restePositif(idx * 23, 4) * 20;
+    ctx.fillStyle = couleur;
+    ctx.fillRect(x, baseY - h, 78, h + HAUTEUR);
+
+    // Toit mansarde : la pente coupee qui fait la silhouette parisienne.
+    ctx.beginPath();
+    ctx.moveTo(x - 4, baseY - h);
+    ctx.lineTo(x + 16, baseY - h - 26);
+    ctx.lineTo(x + 62, baseY - h - 26);
+    ctx.lineTo(x + 82, baseY - h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.07)';
+    ctx.fillRect(x - 4, baseY - h - 2, 86, 3);
+
+    // Fenetres a balconnet, etat stable (numero d'immeuble + rang).
+    let rang = 0;
+    for (let fy = baseY - h + 18; fy < baseY - 24; fy += 30, rang++) {
+      let col = 0;
+      for (let fx = x + 10; fx < x + 66; fx += 19, col++) {
+        const allume = restePositif(idx * 17 + col * 5 + rang * 9, 10) < 4;
+        ctx.fillStyle = allume ? 'rgba(255,214,150,.45)' : 'rgba(0,0,0,.34)';
+        ctx.fillRect(fx, fy, 12, 18);
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
+        ctx.fillRect(fx - 2, fy + 18, 16, 2);
+      }
+    }
+  }
+
+}
+
+function dessinerTourEiffel(cx, baseY, couleur) {
+  /* La hauteur se regle entre deux bornes, et les deux ont ete essayees.
+     A 268 px le sommet sortait du cadre : il n'en restait qu'un tronc evase.
+     A 206 px la tour passait SOUS la ligne des toits du fond (les immeubles
+     montent a 218 px au-dessus de la meme base) et disparaissait entierement.
+     240 px la font depasser le plus haut immeuble d'une bonne vingtaine de
+     pixels tout en tenant dans l'ecran : elle se voit, et elle se reconnait. */
+  const H = 240;
+  const demi = y => 46 * Math.pow(1 - y / H, 1.7) + 5;   // profil evase
+
+  /* Le fut ET l'arche du premier etage sont un SEUL trace, rempli en
+     `evenodd` : le second contour devient un trou dans le premier.
+
+     La version precedente creusait l'arche avec `destination-out`, qui efface
+     tout ce qui a deja ete dessine — pas seulement la tour. Elle perçait donc
+     un trou noir en forme d'arche dans le ciel et dans la ville du fond, bien
+     visible des que la tour arrivait au bord de l'ecran. C'est le meme piege
+     que l'anneau du tokamak, resolu de la meme maniere. */
+  ctx.fillStyle = couleur;
+  ctx.beginPath();
+  ctx.moveTo(cx - demi(0), baseY);
+  for (let y = 0; y <= H; y += 8) ctx.lineTo(cx - demi(y), baseY - y);
+  for (let y = H; y >= 0; y -= 8) ctx.lineTo(cx + demi(y), baseY - y);
+  ctx.closePath();
+  ctx.moveTo(cx - 34, baseY);
+  ctx.quadraticCurveTo(cx, baseY - 78, cx + 34, baseY);
+  ctx.closePath();
+  ctx.fill('evenodd');
+
+  // Les deux plateformes, et le phare qui tourne lentement.
+  ctx.fillStyle = couleur;
+  ctx.fillRect(cx - 38, baseY - 88, 76, 7);
+  ctx.fillRect(cx - 22, baseY - 168, 44, 5);
+  const t = performance.now() / 1000;
+  const p = 0.3 + 0.35 * (0.5 + 0.5 * Math.sin(t * 0.7));
+  ctx.fillStyle = 'rgba(255,236,180,' + p.toFixed(2) + ')';
+  ctx.fillRect(cx - 2, baseY - H - 6, 4, 8);
+}
+
+/* Le plan proche : les toits de zinc, avec cheminees et lucarnes. */
+function dessinerToits(facteur, baseY, couleur) {
+  for (const { idx, x } of rangeeDeFond(facteur, 118)) {
+    const h = 54 + restePositif(idx * 31, 3) * 18;
+    // La pente de zinc
+    ctx.fillStyle = couleur;
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x + 24, baseY - h);
+    ctx.lineTo(x + 94, baseY - h);
+    ctx.lineTo(x + 118, baseY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.09)';
+    ctx.fillRect(x + 24, baseY - h, 70, 3);
+    // Les joints du zinc
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    for (let k = 0; k < 5; k++) ctx.fillRect(x + 30 + k * 15, baseY - h + 4, 2, h - 4);
+
+    // Lucarne
+    ctx.fillStyle = couleur;
+    ctx.fillRect(x + 44, baseY - h - 18, 26, 18);
+    ctx.fillStyle = 'rgba(255,214,150,.3)';
+    ctx.fillRect(x + 49, baseY - h - 13, 16, 11);
+
+    // Souches de cheminee et leurs pots
+    const n = 2 + restePositif(idx * 13, 3);
+    for (let k = 0; k < n; k++) {
+      const bx = x + 10 + k * 26;
+      ctx.fillStyle = 'rgba(0,0,0,.3)';
+      ctx.fillRect(bx, baseY - h - 30, 16, 30);
+      ctx.fillStyle = couleur;
+      ctx.fillRect(bx, baseY - h - 26, 16, 26);
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
+      for (let j = 0; j < 3; j++) ctx.fillRect(bx + 1 + j * 5, baseY - h - 34, 4, 8);
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   NIVEAU 9 — la Lune
+
+   Un ciel noir, des etoiles fixes, la Terre au loin, et des crateres. Les
+   etoiles ne scintillent pas au hasard : leur eclat suit une sinusoide propre
+   a chaque etoile, et leur position depend de leur numero. Un ciel qui se
+   retire chaque image donnerait exactement le grouillement qu'on evite partout
+   ailleurs dans ce jeu.
+-------------------------------------------------------------------------- */
+
+function dessinerCielEtoile(nombre) {
+  const t = performance.now() / 1000;
+  for (let i = 0; i < nombre; i++) {
+    // Parallaxe tres faible : le ciel bouge a peine, comme il se doit.
+    const x = (((i * 197) % (LARGEUR + 200)) - cam.x * 0.02) % (LARGEUR + 200);
+    const y = (i * 89) % (HAUTEUR - 90);
+    const p = 0.35 + 0.3 * Math.sin(t * (0.6 + (i % 5) * 0.2) + i);
+    ctx.fillStyle = 'rgba(255,255,255,' + p.toFixed(2) + ')';
+    const taille = i % 11 === 0 ? 2 : 1;
+    ctx.fillRect(Math.round((x + LARGEUR + 200) % (LARGEUR + 200)) - 100,
+                 Math.round(y), taille, taille);
+  }
+}
+
+/* LA TERRE, VUE DE LA LUNE.
+
+   Elle etait posee a 1400 px du bord du monde, avec un facteur de parallaxe de
+   0,06 : elle ne serait entree dans le cadre qu'a la tuile 750 d'un niveau qui
+   en compte 276. Autrement dit, elle etait dessinee a chaque image, toujours
+   hors de l'ecran, et le panneau qui plaisante dessus ne montrait rien.
+
+   Elle est desormais posee a 470 px : visible d'un bout a l'autre du niveau,
+   elle glisse lentement vers la gauche sans jamais sortir du cadre. */
+const X_TERRE = 470;
+
+function dessinerTerreAuLoin(facteur) {
+  const x = Math.round(X_TERRE - cam.x * facteur);
+  const y = 74;
+  if (x < -160 || x > LARGEUR + 160) return;
+  const t = performance.now() / 1000;
+
+  // Halo atmospherique
+  const g = ctx.createRadialGradient(x, y, 40, x, y, 78);
+  g.addColorStop(0, 'rgba(120,180,255,.28)');
+  g.addColorStop(1, 'rgba(120,180,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 80, y - 80, 160, 160);
+
+  ctx.fillStyle = '#2a5aa8';
+  ctx.beginPath(); ctx.arc(x, y, 46, 0, Math.PI * 2); ctx.fill();
+  // Continents : des taches fixes, dessinees une fois pour toutes.
+  ctx.fillStyle = '#3f8a52';
+  [[-16, -14, 18, 12], [6, 4, 20, 15], [-8, 20, 14, 9], [22, -18, 11, 8]]
+    .forEach(([dx, dy, rx, ry]) => {
+      ctx.beginPath();
+      ctx.ellipse(x + dx, y + dy, rx, ry, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  // Nuages, qui derivent tres lentement.
+  ctx.fillStyle = 'rgba(255,255,255,.22)';
+  for (let k = 0; k < 3; k++) {
+    const a = t * 0.06 + k * 2.1;
+    ctx.beginPath();
+    ctx.ellipse(x + Math.cos(a) * 24, y + Math.sin(a * 0.7) * 18, 20, 7, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Terminateur : le cote nuit.
+  ctx.fillStyle = 'rgba(6,10,22,.55)';
+  ctx.beginPath();
+  ctx.arc(x, y, 46, -Math.PI / 2.4, Math.PI / 2.4);
+  ctx.fill();
+}
+
+function dessinerCrateres(facteur, baseY, couleur) {
+  for (const { idx, x } of rangeeDeFond(facteur, 156)) {
+    // Un relief de collines basses, bord de cratere.
+    const h = 44 + restePositif(idx * 29, 4) * 16;
+    ctx.fillStyle = couleur;
+    ctx.beginPath();
+    ctx.moveTo(x - 20, baseY);
+    ctx.quadraticCurveTo(x + 40, baseY - h, x + 78, baseY - h * 0.7);
+    ctx.quadraticCurveTo(x + 120, baseY - h * 1.3, x + 176, baseY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Crateres poses dessus : un anneau clair, un creux sombre.
+    for (let k = 0; k < 3; k++) {
+      const r = 9 + restePositif(idx * 7 + k * 11, 4) * 5;
+      const cx = x + 26 + k * 50;
+      const cy = baseY - 8 - ((idx + k) % 3) * 5;
+      ctx.fillStyle = 'rgba(255,255,255,.09)';
+      ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.3)';
+      ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.66, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   NIVEAU 8 — le tokamak
+
+   La salle du reacteur montrait une colonne lumineuse qu'on ne voyait pas en
+   franchissant le sas : trop sombre, trop petite, et surtout sans forme
+   reconnaissable. Elle est remplacee par un TOKAMAK — la chambre torique des
+   reacteurs a fusion, clin d'oeil au projet CORE.
+
+   Il est dessine grand et espace : une machine par ecran environ, pour qu'on
+   en voie une entiere plutot que trois moities. Le plasma pulse par sinusoide
+   lente, comme tout ce qui varie dans ce jeu.
+-------------------------------------------------------------------------- */
+
+function dessinerTokamak(facteur, baseY, couleur) {
+  const t = performance.now() / 1000;
+
+  for (const { idx, x } of rangeeDeFond(facteur, 470)) {
+    const cx = x + 200;
+    const cy = baseY - 132;
+    const pulse = 0.5 + 0.22 * Math.sin(t * 0.8 + idx);
+
+    // --- Le hall autour : une paroi et une passerelle, pour donner l'echelle.
+    ctx.fillStyle = couleur;
+    ctx.fillRect(x, baseY - 236, 400, 236 + HAUTEUR);
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    ctx.fillRect(x, baseY - 236, 400, 3);
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.fillRect(x + 10, baseY - 60, 380, 6);
+
+    /* --- La chambre torique, vue de trois quarts. Deux ellipses concentriques
+       remplies en `evenodd` : c'est ce qui donne l'anneau, sans avoir a
+       repeindre le fond par-dessus. */
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 146, 104, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, 74, 48, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(26,44,58,.95)';
+    ctx.fill('evenodd');
+    ctx.strokeStyle = 'rgba(150,200,225,.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    /* --- Le plasma : un anneau lumineux a l'interieur de la chambre. Trois
+       traits concentriques d'opacite decroissante font le halo sans passer par
+       un degrade radial, qui suivrait mal une ellipse. */
+    for (const [r, l, a] of [[110, 12, 0.5], [110, 22, 0.22], [110, 34, 0.1]]) {
+      ctx.strokeStyle = 'rgba(120,232,255,' + (a * pulse * 2).toFixed(3) + ')';
+      ctx.lineWidth = l;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r, 76, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(226,250,255,' + (0.55 * pulse * 2).toFixed(3) + ')';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 110, 76, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    /* --- Les bobines de champ toroidal : des anneaux qui enserrent la chambre,
+       repartis tout autour. Ce sont eux qui font reconnaitre un tokamak plutot
+       qu'un simple beignet lumineux. */
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      const bx = cx + Math.cos(a) * 110;
+      const by = cy + Math.sin(a) * 76;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.strokeStyle = 'rgba(190,215,235,.3)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 13, 34, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // --- Le solenoide central, et son reflet sur le sol du hall.
+    ctx.fillStyle = 'rgba(40,62,80,.95)';
+    ctx.fillRect(cx - 16, cy - 44, 32, 88);
+    ctx.fillStyle = 'rgba(140,190,215,.25)';
+    for (let k = 0; k < 7; k++) ctx.fillRect(cx - 16, cy - 40 + k * 12, 32, 3);
+
+    const reflet = ctx.createLinearGradient(0, cy + 104, 0, baseY);
+    reflet.addColorStop(0, 'rgba(120,232,255,' + (0.16 * pulse * 2).toFixed(3) + ')');
+    reflet.addColorStop(1, 'rgba(120,232,255,0)');
+    ctx.fillStyle = reflet;
+    ctx.fillRect(cx - 150, cy + 104, 300, baseY - (cy + 104));
+
+    // --- Pieds de la machine
+    ctx.fillStyle = 'rgba(30,46,60,.95)';
+    ctx.fillRect(cx - 120, cy + 96, 16, baseY - cy - 96);
+    ctx.fillRect(cx + 104, cy + 96, 16, baseY - cy - 96);
+  }
+}
+
 function dessinerNeige(nombre) {
   const t = performance.now() / 1000;
   for (let i = 0; i < nombre; i++) {
@@ -786,19 +1150,19 @@ function dessinerStalactites(facteur, couleur) {
   ctx.fillStyle = couleur;
   ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
   for (const { idx, x } of rangeeDeFond(facteur, 54)) {
-    const h = 26 + ((idx * 17) % 5) * 13;
+    const h = 26 + restePositif(idx * 17, 5) * 13;
     ctx.fillStyle = 'rgba(0,0,0,.3)';
     ctx.beginPath();
     ctx.moveTo(x, 0); ctx.lineTo(x + 22, 0); ctx.lineTo(x + 11, h);
     ctx.closePath(); ctx.fill();
-    const hb = 18 + ((idx * 23) % 4) * 11;
+    const hb = 18 + restePositif(idx * 23, 4) * 11;
     ctx.beginPath();
     ctx.moveTo(x + 27, 300); ctx.lineTo(x + 45, 300); ctx.lineTo(x + 36, 300 - hb);
     ctx.closePath(); ctx.fill();
   }
   // Quelques cristaux qui accrochent la lumiere
   for (const { idx, x } of rangeeDeFond(facteur * 1.4, 130)) {
-    const y = 150 + ((idx * 31) % 5) * 22;
+    const y = 150 + restePositif(idx * 31, 5) * 22;
     const brille = 0.25 + 0.25 * Math.sin(performance.now() / 900 + idx);
     ctx.fillStyle = 'rgba(150,120,220,' + brille.toFixed(2) + ')';
     ctx.fillRect(x, y, 4, 10);
@@ -816,6 +1180,25 @@ function dessinerStalactites(facteur, couleur) {
    du debut a la fin du niveau.
 
    Renvoie, pour chaque element visible, son index absolu et son abscisse. */
+/* MODULO POSITIF.
+
+   `rangeeDeFond` numerote les motifs par leur INDICE DANS LE MONDE, et cet
+   indice est negatif au tout debut d'un niveau (camera a zero, premier motif
+   a -1). Or en JavaScript, (-7) % 4 vaut -3, pas 1. Toutes les variations de
+   decor ecrites « (idx * 29) % 4 » renvoyaient donc des valeurs negatives sur
+   les premiers ecrans : hauteurs raccourcies, et sur la Lune un rayon de
+   cratere de -6 px, ce que ctx.ellipse() refuse net — le rendu du niveau 9
+   s'arretait sur une exception des la premiere image.
+
+   Cette fonction ramene le reste dans [0, m[. Tous les motifs de decor
+   passent desormais par elle.
+
+   Elle ne s'appelle PAS « motif » : trois fonctions de ce fichier declarent
+   deja un tableau local de ce nom, et l'appel s'y serait resolu — c'est
+   exactement l'erreur qu'a levee le premier essai (« motif is not a
+   function », dans dessinerVilleHiver). */
+function restePositif(n, m) { return ((n % m) + m) % m; }
+
 function rangeeDeFond(facteur, pas) {
   const defilement = cam.x * facteur;
   const premier = Math.floor(defilement / pas) - 1;
@@ -859,15 +1242,38 @@ function dessinerTours(facteur, baseY, couleur) {
 }
 
 /* Zone 2 : des tuyaux verticaux, pour l'interieur du complexe. */
-function dessinerTuyaux(facteur, couleur) {
-  ctx.fillStyle = couleur;
-  ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
-  ctx.fillStyle = 'rgba(255,255,255,.045)';
+/* LES TUYAUX DU COMPLEXE, ET LE BUG QU'ILS CACHAIENT.
+
+   Cette fonction sert a deux endroits opposes : comme PREMIERE couche, ou elle
+   doit poser le mur du fond, et comme couche AVANT, par-dessus une machine
+   deja dessinee.
+
+   Elle repeignait l'ecran entier dans les deux cas. La salle du reacteur
+   appelait donc `dessinerReacteur(...)` PUIS `dessinerTuyaux(...)`, et le
+   second effacait purement et simplement le premier : le reacteur etait
+   dessine a chaque image, puis recouvert avant d'etre montre. C'est la cause,
+   trouvee ici, du « au changement de seconde zone, on ne perçoit pas le
+   reacteur » : il ne manquait pas de lumiere, il manquait d'exister a l'ecran.
+
+   `avant` distingue les deux usages. En couche avant, aucun fond n'est pose et
+   les tuyaux passent en silhouette sombre — ce qui est de toute façon ce qu'on
+   voit d'un tuyau place devant une machine allumee. */
+function dessinerTuyaux(facteur, couleur, avant) {
+  if (!avant) {
+    ctx.fillStyle = couleur;
+    ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+  }
+  ctx.fillStyle = avant ? 'rgba(8,14,22,.45)' : 'rgba(255,255,255,.045)';
   for (const { idx, x } of rangeeDeFond(facteur, 72)) {
     ctx.fillRect(x, 0, 14, HAUTEUR);
     const rang = ((idx % 3) + 3) % 3;
     ctx.fillRect(x - 4, 90 + rang * 54, 22, 8);
   }
+  // Un liseré clair sur le bord des tuyaux de devant : sans lui, ce ne sont
+  // que des bandes noires, et l'on ne lit plus des tuyaux mais des barreaux.
+  if (!avant) return;
+  ctx.fillStyle = 'rgba(190,220,240,.10)';
+  for (const { x } of rangeeDeFond(facteur, 72)) ctx.fillRect(x + 12, 0, 2, HAUTEUR);
 }
 
 function dessinerNiveau() {
@@ -1586,7 +1992,7 @@ function bandeau() {
   ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
   ctx.textAlign = 'left';
   ctx.fillStyle = '#8d93ab';
-  const h = (R.forceSaut * R.forceSaut) / (2 * R.gravite);
+  const h = (R.forceSaut * R.forceSaut) / (2 * graviteCourante());
   const eveilles = ennemis.filter(e => e.etat !== 'mort' && !e.dort).length;
   const infos = [
     'vx ' + Math.abs(brad.vx).toFixed(0).padStart(3),
@@ -1667,6 +2073,9 @@ function rendreNiveau() {
   dessinerGlace();
   dessinerArene();
   dessinerVisee();
+  // Le marquage des impacts est une marque AU SOL : il passe sous les acteurs,
+  // sinon on ne sait plus si l'on se tient dedans ou devant.
+  dessinerMarquagesAsteroides();
   dessinerTrampolines();
   dessinerDalles();
   dessinerLasers();
@@ -1679,6 +2088,8 @@ function rendreNiveau() {
   dessinerEnnemis();
   dessinerBoules();
   dessinerBrad();
+  // Les rochers arrivent du ciel : ils passent devant tout le monde.
+  dessinerAsteroides();
   dessinerEffets();
   // Le manoir qui s'eteint pendant le bonneteau du niveau 6 : le voile passe
   // par-dessus tout le monde, les lueurs des copies par-dessus le voile.

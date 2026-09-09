@@ -25,7 +25,8 @@ ctx.imageSmoothingEnabled = false;
 
 const NIVEAUX = {};
 const ORDRE_NIVEAUX = ['intro', 'niveau1', 'niveau2', 'niveau3',
-                       'niveau4', 'niveau5', 'niveau6', 'niveau7'];
+                       'niveau4', 'niveau5', 'niveau6', 'niveau7',
+                       'niveau8', 'niveau9'];
 
 let niveauCourant = 'intro';
 let ZONES = [];
@@ -41,6 +42,22 @@ let SAS = null;          // le premier sas, garde pour les usages simples
 let SAS_LISTE = [];      // tous les sas du niveau, dans l'ordre des zones
 let AUDIO_NIVEAU = null;
 let ENTRAINEMENT = false;      // vrai dans le camp : aucune recompense possible
+
+/* -----------------------------------------------------------------------------
+   LA GRAVITE DU NIVEAU
+
+   Un niveau peut declarer `gravite: 0.55` — la Lune. C'est un MULTIPLICATEUR
+   du reglage global, jamais une valeur absolue : le curseur « Gravité » du
+   panneau continue ainsi de piloter tout le jeu, et un niveau leger reste
+   leger quel que soit le reglage.
+
+   Tout ce qui tombe passe par `graviteCourante()` : Brad, les ennemis, les
+   boules, les pieces. Une Lune ou seul le heros flotterait, pendant que les
+   Serra tombent comme des pierres, se lirait comme un bug.
+-------------------------------------------------------------------------- */
+let GRAVITE_NIVEAU = 1;
+
+function graviteCourante() { return R.gravite * GRAVITE_NIVEAU; }
 
 /* L'arene de boss, quand le niveau en a une. En pixels apres chargement :
      { x1, x2 }        les bornes horizontales de la salle
@@ -88,6 +105,7 @@ function chargerNiveau(id) {
   SAS = SAS_LISTE[0] || null;
   AUDIO_NIVEAU = d.musique ? sourceMusique(d.musique) : null;
   ENTRAINEMENT = !!d.entrainement;
+  GRAVITE_NIVEAU = d.gravite === undefined ? 1 : d.gravite;
 
   ARENE = d.arene
     ? {

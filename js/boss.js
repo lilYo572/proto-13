@@ -51,6 +51,49 @@ const SEUILS_BLINDAGE = [0.72, 0.45, 0.2];
    qui ne laisse passer qu'un point tous les trois coups, le joueur devait en
    placer dix-huit avant de voir la premiere division. Le bonneteau est le
    coeur du combat, pas sa recompense finale — il doit arriver tot. */
+/* -----------------------------------------------------------------------------
+   LE TROISIEME GENRE DE COMBAT : LA PLUIE D'ASTEROIDES (niveau 9)
+
+   Le Serra-Balistique ne se blinde pas et ne se divise pas : il ENCAISSE. Sa
+   coque ne laisse passer qu'un quart des degats, et aucun coup de Brad n'y
+   changera rien dans un delai raisonnable.
+
+   Ce qui lui fait mal tombe du ciel. Le champ d'asteroides bombarde la salle
+   en continu ; chaque impact est annonce une seconde et demie a l'avance par
+   un cercle au sol, POSE LA OU SE TROUVE BRAD au moment de l'annonce.
+
+   D'ou le combat : rester sur le cercle, laisser le Balistique venir — il
+   marche vers Brad, moins vite que lui —, et s'ecarter au dernier instant. Le
+   rocher trouve le boss a la place du joueur.
+
+   Ce que cette construction garantit :
+
+   - Aucun hasard. Le marquage suit Brad ; c'est LUI qui choisit ou tombera le
+     prochain rocher. Rater l'appat est une erreur de placement, pas un tirage.
+   - Deux esquives possibles. S'ecarter, ou sauter — un asteroide ne touche que
+     ce qui est pres du sol, et le saut lunaire monte a 134 px. Les deux
+     laissent le boss dessous.
+   - Aucun blocage. La coque n'est pas une invulnerabilite : le joueur qui n'a
+     rien compris finit par gagner au poing, tres lentement. Il n'est jamais
+     enferme.
+   - La fenetre de degats est PROPRE. Un boss assomme arrete la pluie : on ne
+     lui fait pas payer sa recompense en le bombardant pendant qu'il frappe.
+-------------------------------------------------------------------------- */
+
+const ASTEROIDE = {
+  annonce: 1.5,          // duree du marquage au sol, en secondes
+  chute: 520,            // px/s — le rocher entre dans l'ecran ~0,55 s avant
+  rayon: 30,             // demi-largeur de la zone d'impact
+  hauteurLetale: 90,     // au-dessus, on est passe entre les gouttes
+  degatsBrad: 2,
+  degatsBoss: 7,
+};
+
+/* La cadence de la pluie se resserre a mesure que le boss faiblit : le combat
+   s'accelere sans jamais changer de regle. */
+const INTERVALLES_PLUIE = [3.4, 2.8, 2.2];
+const DUREE_SONNE = 2.8;             // fenetre de degats apres un impact
+
 const SEUILS_DUPLICATION = [0.9, 0.6, 0.3];
 const COPIES_PAR_CYCLE = [5, 7, 9];
 const DUREE_REVELATION = 1.5;                    // le vrai est designe
@@ -86,6 +129,11 @@ const arene = {
   noirceur: 0,          // obscurite courante, 0 a 1
   noirceurCible: 0,
   retourMusique: 0,     // compte a rebours avant le retour du theme du niveau
+
+  // --- propres au combat lunaire ---
+  asteroides: [],       // {x, t, y, r, rot}
+  prochaineChute: 0,
+  sonneVu: false,       // le boss etait assomme a l'image precedente
 };
 
 function reinitialiserArene() {
@@ -117,6 +165,13 @@ function reinitialiserArene() {
   arene.noirceur = 0;
   arene.noirceurCible = 0;
   arene.retourMusique = 0;
+
+  /* Les rochers en vol doivent partir avec le reste. Mourir sous la pluie
+     laissait sinon trois asteroides suspendus au-dessus d'une salle vide, qui
+     tombaient sur Brad des sa reapparition. */
+  arene.asteroides = [];
+  arene.prochaineChute = 2.2;      // un temps de repit a l'entree dans la salle
+  arene.sonneVu = false;
 }
 
 /* La sortie du niveau reste verrouillee tant qu'un boss vit encore : un niveau
@@ -223,6 +278,10 @@ function majArene(dt) {
      scenario ici, sans toucher a celui des deux autres. */
   if (ARENE.genre === 'duplication') {
     majAreneDuplication(dt, b);
+    return;
+  }
+  if (ARENE.genre === 'asteroides') {
+    majAreneAsteroides(dt, b);
     return;
   }
 
@@ -357,6 +416,171 @@ function contenirDansArene(b) {
   const cx = b.x + b.w / 2;
   if (cx < ARENE.x1 + 20) { b.x = ARENE.x1 + 20 - b.w / 2; b.sens = 1; }
   if (cx > ARENE.x2 - 20) { b.x = ARENE.x2 - 20 - b.w / 2; b.sens = -1; }
+}
+
+/* -----------------------------------------------------------------------------
+   LE COMBAT DU SERRA-BALISTIQUE
+-------------------------------------------------------------------------- */
+
+function majAreneAsteroides(dt, b) {
+  contenirDansArene(b);
+  degagerDuBoss(b);
+
+  /* Bascule assomme -> debout. On la detecte par comparaison avec l'image
+     precedente plutot qu'avec un minuteur separe : `assomme` est deja
+     decremente par majEnnemis(), et deux compteurs pour un seul etat finissent
+     toujours par se contredire. */
+  if (b.assomme > 0) {
+    arene.sonneVu = true;
+  } else if (arene.sonneVu) {
+    arene.sonneVu = false;
+    arene.vague++;
+    annoncerArene('IL SE RESSAISIT', 2.0);
+    lancerRenforts(arene.vague - 1);
+    // Un temps mort avant que la pluie ne reprenne : sortir d'une fenetre de
+    // degats sous un rocher deja marque serait une punition qu'on n'a pas vue
+    // venir.
+    arene.prochaineChute = Math.max(arene.prochaineChute, 1.4);
+  }
+
+  majAsteroides(dt, b);
+}
+
+/* La cadence de la pluie, lue sur la vie du boss. */
+function cadencePluie(b) {
+  const f = b.pvMax > 0 ? b.pv / b.pvMax : 1;
+  const i = f > 0.66 ? 0 : (f > 0.33 ? 1 : 2);
+  return INTERVALLES_PLUIE[i];
+}
+
+function majAsteroides(dt, b) {
+  /* Pendant qu'il est sonne, le ciel se tait. Voir le commentaire d'en-tete.
+     La condition s'ecrit `!(… > 0)` et non `… <= 0` : un ennemi qui n'a jamais
+     ete assomme portait autrefois `undefined`, et `undefined <= 0` vaut faux.
+     `assomme` est desormais initialise a zero, mais la forme negative reste la
+     bonne — elle ne peut pas se retourner contre nous. */
+  if (!(b.assomme > 0)) {
+    arene.prochaineChute -= dt;
+    if (arene.prochaineChute <= 0) {
+      arene.prochaineChute = cadencePluie(b);
+      lancerAsteroide();
+    }
+  }
+
+  for (let i = arene.asteroides.length - 1; i >= 0; i--) {
+    const a = arene.asteroides[i];
+    a.t -= dt;
+    a.rot += dt * 2.6;
+    /* La position VERTICALE se deduit du temps restant, elle ne s'integre pas.
+       Un rocher qui accumulerait sa propre vitesse finirait par ne plus tomber
+       exactement quand le cercle se ferme — et c'est precisement cette
+       promesse-la que le combat demande de tenir. */
+    a.y = ARENE.sol - ASTEROIDE.chute * Math.max(0, a.t);
+    if (a.t > 0) continue;
+    impactAsteroide(a, b);
+    arene.asteroides.splice(i, 1);
+  }
+}
+
+/* Le marquage tombe LA OU EST BRAD. C'est ce qui fait de la pluie un outil et
+   non une nuisance : le joueur choisit l'endroit, le boss vient a lui. */
+function lancerAsteroide() {
+  const marge = ASTEROIDE.rayon + 14;
+  const x = Math.max(ARENE.x1 + marge,
+            Math.min(ARENE.x2 - marge, brad.x + brad.w / 2));
+  arene.asteroides.push({
+    x,
+    t: ASTEROIDE.annonce,
+    y: ARENE.sol - ASTEROIDE.chute * ASTEROIDE.annonce,
+    r: 13 + Math.random() * 5,
+    rot: Math.random() * 6.28,
+  });
+  audio.bruit('asteroide');
+}
+
+/* Un corps est-il dans la zone d'impact ? Deux conditions, et la seconde est
+   la moitie du jeu : il faut etre PRES DU SOL. Sauter est une esquive au meme
+   titre que s'ecarter. */
+function toucheParImpact(a, c) {
+  const cx = c.x + c.w / 2;
+  if (Math.abs(cx - a.x) > ASTEROIDE.rayon + c.w / 2) return false;
+  return c.y + c.h > ARENE.sol - ASTEROIDE.hauteurLetale;
+}
+
+function impactAsteroide(a, b) {
+  particules(a.x, ARENE.sol - 4, 22, '#c9b9a4');
+  particules(a.x, ARENE.sol - 4, 10, '#ff9a5c');
+  secousse(9, 0.45);
+  audio.bruit('ecrase');
+
+  // Le boss. C'est LA maniere de lui faire mal, et la seule qui vaille.
+  if (b.etat !== 'mort' && toucheParImpact(a, b)) {
+    blesserEnnemi(b, ASTEROIDE.degatsBoss, Math.sign((b.x + b.w / 2) - a.x) || 1,
+                  true, true);
+    if (b.etat !== 'mort') {
+      b.assomme = DUREE_SONNE;
+      b.rechargeTir = DUREE_SONNE;
+      audio.bruit('victoire');
+      annoncerArene('EN PLEIN DESSUS — FRAPPE !', 2.6);
+      texteFlottant(b.x + b.w / 2, b.y, 'assommé', '#7ee08a');
+    }
+  }
+
+  if (brad.invincible <= 0 && brad.scenarise <= 0 && toucheParImpact(a, brad)) {
+    blesserBrad(ASTEROIDE.degatsBrad, a.x, 'astéroïde');
+  }
+}
+
+/* Les renforts, appeles quand le boss se ressaisit. Generique : la duplication
+   s'en sert aussi (voir lancerVagueSpectres). */
+function lancerRenforts(index) {
+  const listes = ARENE.renforts || [];
+  if (!listes.length) return;
+  const vague = listes[Math.min(Math.max(0, index), listes.length - 1)];
+  if (!vague || !vague.length) return;
+  arene.sbires = vague.map(r => invoquer(r.type, r.x, r.y));
+  audio.bruit('onde');
+}
+
+/* Le pilotage du Balistique. Il marche, il tire, et quand il est sonne il ne
+   fait plus rien du tout. */
+function majBalistique(b, dt) {
+  const poser = () => {
+    b.vy = Math.min(R.chuteMax, b.vy + graviteCourante() * dt);
+    b.y += b.vy * dt;
+    if (b.y > ARENE.sol - b.h) { b.y = ARENE.sol - b.h; b.vy = 0; }
+  };
+
+  if (b.assomme > 0) {
+    b.vx = 0;
+    poser();
+    return;
+  }
+
+  /* Vitesse de marche : 1,6 x 42 = 67 px/s, contre 150 au PAS pour Brad. Il ne
+     rattrape donc jamais personne — c'est la condition pour que rester sur un
+     marquage soit un choix et non une condamnation. Le facteur 1,4 sur l'ecart
+     le fait ralentir quand il arrive au contact : il s'attarde sous le cercle
+     au lieu de le traverser. */
+  const base = b.t.vitesse * vitesseEnnemiEffective();
+  const ecart = (brad.x + brad.w / 2) - (b.x + b.w / 2);
+  b.sens = Math.sign(ecart) || b.sens;
+  b.vx = Math.max(-base, Math.min(base, ecart * 1.4));
+  b.x += b.vx * dt;
+  poser();
+
+  // Le tir. Meme cloche que le Lanceur ordinaire — c'est sa famille — mais
+  // plus lente, et il tire en marchant.
+  b.rechargeTir = (b.rechargeTir || 0) - dt;
+  if (b.rechargeTir > 0) return;
+  b.rechargeTir = b.t.cadence;
+  const dist = Math.abs(ecart);
+  boules.push({
+    x: b.x + b.w / 2 - 7, y: b.y + 10, w: 14, h: 14,
+    vx: b.sens * Math.min(240, 120 + dist * 0.5),
+    vy: -150 - Math.min(110, dist * 0.3),
+    aBrad: false, vie: 9, phase: 0, posee: 0,
+  });
 }
 
 /* Les positions de repos des copies. Toutes sont a portee d'un saut : une
@@ -552,10 +776,7 @@ function recomposerSeraphin(b, touche) {
    doit deviner tout seul. Elle accompagne la phase geante, ou elle sert a
    l'empecher de marteler tranquillement. */
 function lancerVagueSpectres() {
-  const vague = (ARENE.renforts || [])[Math.min(arene.cycle - 1, (ARENE.renforts || []).length - 1)];
-  if (!vague || !vague.length) return;
-  arene.sbires = vague.map(r => invoquer(r.type, r.x, r.y));
-  audio.bruit('onde');
+  lancerRenforts(arene.cycle - 1);
 }
 
 /* -----------------------------------------------------------------------------
@@ -595,6 +816,7 @@ const REPOS_PIQUE = 3.2;          // avant qu'il puisse recommencer
 
 function majPilote(e, dt, dx, dy) {
   if (e.t.pilotage === 'copie') return majCopie(e, dt);
+  if (e.t.pilotage === 'balistique') return majBalistique(e, dt);
   return majSeraphin(e, dt, dx, dy);
 }
 
@@ -731,6 +953,100 @@ function dessinerVisee() {
     ctx.lineTo(x, cy + 7);
     ctx.closePath();
     ctx.fill();
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   LA PLUIE, DESSINEE
+
+   Deux passes, et l'ordre compte.
+
+   1. LE MARQUAGE AU SOL, pose AVANT les acteurs. C'est une marque sur le
+      terrain : la voir par-dessus Brad donnerait un autocollant flottant, et
+      surtout on ne saurait plus si l'on est dedans ou devant.
+   2. LE ROCHER, dessine APRES tout le monde. Il arrive du ciel, il passe
+      devant.
+
+   Le cercle se RESSERRE a mesure que l'echeance approche, exactement comme le
+   trait de visee du Seraphin : la duree restante se lit sans compter.
+-------------------------------------------------------------------------- */
+
+function dessinerMarquagesAsteroides() {
+  if (!ARENE || !arene.asteroides.length) return;
+  const sol = Math.round(ARENE.sol - cam.y);
+  const t = performance.now() / 1000;
+
+  for (const a of arene.asteroides) {
+    const x = Math.round(a.x - cam.x);
+    if (x < -80 || x > LARGEUR + 80) continue;
+    const avance = 1 - Math.max(0, a.t) / ASTEROIDE.annonce;   // 0 -> 1
+    const r = ASTEROIDE.rayon * (1.35 - avance * 0.35);
+
+    // Le disque : discret au debut, franc a la fin.
+    ctx.save();
+    ctx.translate(x, sol - 1);
+    ctx.scale(1, 0.34);                       // vu en perspective, c'est une ellipse
+    ctx.fillStyle = 'rgba(255,140,80,' + (0.10 + 0.26 * avance).toFixed(2) + ')';
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,190,120,' + (0.45 + 0.45 * avance).toFixed(2) + ')';
+    ctx.lineWidth = 2 / 0.34;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    // L'anneau interieur, qui se ferme : la seconde qui reste, en image.
+    ctx.strokeStyle = 'rgba(255,236,190,' + (0.3 + 0.6 * avance).toFixed(2) + ')';
+    ctx.lineWidth = 1.6 / 0.34;
+    ctx.beginPath(); ctx.arc(0, 0, r * (1 - avance) + 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    // La croix de visee, en vraies proportions par-dessus l'ellipse.
+    ctx.fillStyle = 'rgba(255,210,150,' + (0.35 + 0.45 * Math.abs(Math.sin(t * 8))).toFixed(2) + ')';
+    ctx.fillRect(x - r, sol - 2, r * 2, 1);
+    ctx.fillRect(x - 1, sol - 8, 2, 8);
+  }
+}
+
+function dessinerAsteroides() {
+  if (!ARENE || !arene.asteroides.length) return;
+
+  for (const a of arene.asteroides) {
+    const x = Math.round(a.x - cam.x);
+    const y = Math.round(a.y - cam.y);
+    if (x < -90 || x > LARGEUR + 90 || y > HAUTEUR + 60) continue;
+
+    // La trainee : elle dit d'ou ça vient et a quelle vitesse.
+    const g = ctx.createLinearGradient(0, y - 90, 0, y);
+    g.addColorStop(0, 'rgba(255,140,60,0)');
+    g.addColorStop(1, 'rgba(255,170,90,.5)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - 4, y - 90, 8, 90);
+
+    // Le rocher : un polygone irregulier, jamais un cercle — un caillou rond
+    // se lirait comme une balle.
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a.rot);
+    ctx.fillStyle = '#6e6455';
+    ctx.beginPath();
+    for (let k = 0; k < 7; k++) {
+      const ang = (k / 7) * Math.PI * 2;
+      const rr = a.r * (0.78 + ((k * 37) % 11) / 24);
+      const px = Math.cos(ang) * rr, py = Math.sin(ang) * rr;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#8d8171';
+    ctx.beginPath();
+    ctx.arc(-a.r * 0.25, -a.r * 0.3, a.r * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#4c443a';
+    ctx.beginPath();
+    ctx.arc(a.r * 0.3, a.r * 0.18, a.r * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Le bord chauffe a blanc, du cote de la course.
+    ctx.fillStyle = 'rgba(255,214,150,.5)';
+    ctx.fillRect(x - a.r * 0.7, y + a.r * 0.55, a.r * 1.4, 2);
   }
 }
 
@@ -1213,7 +1529,10 @@ function dessinerBlindage(cx, bas, e) {
       // pas invulnerable et le dessin ne doit pas le laisser croire.
       ctx.save();
       ctx.translate(cx, bas - e.h / 2);
-      ctx.strokeStyle = 'rgba(198,150,255,' + (0.35 + 0.15 * Math.sin(t * 3)).toFixed(2) + ')';
+      // La coque prend la couleur du boss : violette au manoir, bleue sur la
+      // Lune. Deux combats differents ne doivent pas se ressembler a l'ecran.
+      ctx.strokeStyle = 'rgba(' + (e.t.coqueRGB || '198,150,255') + ',' +
+                        (0.35 + 0.15 * Math.sin(t * 3)).toFixed(2) + ')';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.ellipse(0, 0, e.w * 0.62, e.h * 0.58, 0, 0, Math.PI * 2);
@@ -1254,6 +1573,7 @@ function hudArene() {
        coups portent : c'est la seule chose que le joueur ait besoin de lire
        pendant un combat de boss. */
     const duplication = ARENE.genre === 'duplication';
+    const lunaire = ARENE.genre === 'asteroides';
     const etats = {
       geant: ['IL RÉSISTE', '#c8a0ff'],
       revelation: ['REGARDE BIEN', '#ffe9a8'],
@@ -1262,7 +1582,14 @@ function hudArene() {
       assomme: ['ASSOMMÉ — FRAPPE !', '#7ee08a'],
     };
     const etat = duplication ? etats[arene.phase] : null;
-    const couleur = duplication ? etat[1] : (arene.blinde ? '#78beff' : '#e8b62c');
+    /* L'etat du combat lunaire tient en deux mots : soit sa coque tient, soit
+       il est a terre. C'est exactement ce que le joueur a besoin de savoir
+       pour decider s'il frappe ou s'il replace un appat. */
+    const etatLune = b.assomme > 0 ? ['ASSOMMÉ — FRAPPE !', '#7ee08a']
+                                   : ['SA COQUE TIENT', '#9ac4ff'];
+    const couleur = duplication ? etat[1]
+                  : lunaire ? etatLune[1]
+                  : (arene.blinde ? '#78beff' : '#e8b62c');
 
     ctx.font = 'bold 10px system-ui, sans-serif';
     ctx.textAlign = 'left';
@@ -1275,6 +1602,11 @@ function hudArene() {
       ctx.fillText(etat[0] + (arene.copies.length ? ' · ' + arene.copies.length + ' copies' : ''),
                    x + l, y - 5);
       ctx.textAlign = 'left';
+    } else if (lunaire) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = couleur;
+      ctx.fillText(etatLune[0], x + l, y - 5);
+      ctx.textAlign = 'left';
     } else if (arene.blinde) {
       ctx.textAlign = 'right';
       ctx.fillStyle = '#78beff';
@@ -1286,14 +1618,19 @@ function hudArene() {
     ctx.fillStyle = 'rgba(255,255,255,.12)';
     ctx.fillRect(x, y, l, 7);
     const f = Math.max(0, b.pv / b.pvMax);
-    ctx.fillStyle = duplication
-      ? (b.assomme > 0 ? '#7ee08a' : '#8b5fc0')
+    ctx.fillStyle = (duplication || lunaire)
+      ? (b.assomme > 0 ? '#7ee08a' : (lunaire ? '#4f7bb8' : '#8b5fc0'))
       : (arene.blinde ? '#4a86c8' : '#d8483c');
     ctx.fillRect(x, y, Math.round(l * f), 7);
     // Reperes des seuils : le joueur voit venir la prochaine bascule.
-    ctx.fillStyle = 'rgba(9,11,20,.75)';
-    for (const s of (duplication ? SEUILS_DUPLICATION : SEUILS_BLINDAGE)) {
-      ctx.fillRect(x + Math.round(l * s), y, 2, 7);
+    /* Les reperes de seuil n'ont de sens que pour les combats a paliers. La
+       pluie lunaire n'en a pas : elle se resserre en continu, et poser trois
+       traits sur la barre annoncerait une bascule qui n'existe pas. */
+    if (!lunaire) {
+      ctx.fillStyle = 'rgba(9,11,20,.75)';
+      for (const s of (duplication ? SEUILS_DUPLICATION : SEUILS_BLINDAGE)) {
+        ctx.fillRect(x + Math.round(l * s), y, 2, 7);
+      }
     }
     ctx.strokeStyle = 'rgba(255,255,255,.25)';
     ctx.lineWidth = 1;
