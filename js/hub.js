@@ -24,12 +24,18 @@ const POSTES = [
   { cle: 'arcade',       x: 1120, nom: 'Arcade',      sous: 'Serra Invaders' },
   { cle: 'jukebox',      x: 1290, nom: 'Jukebox',     sous: 'Musique de la base' },
   { cle: 'carte',        x: 1560, nom: 'Carte',       sous: 'Départ en mission' },
-  /* LE PORTAIL. Il n'existe qu'entre le manoir et la fin du jeu : avant, il
-     n'y a rien de l'autre cote ; apres, il n'y a plus personne. Il est pose au
-     BOUT de la base, plus loin que la carte — on passe donc devant la boutique
-     avant de l'atteindre, ce qui est exactement l'effet voulu. */
-  { cle: 'portail', x: 1748, nom: 'Portail', sous: 'Le monde réel',
-    condition: () => partie.manoirFait && !partie.finalGagne },
+  /* LE PORTAIL. Il n'existe pas avant le manoir — il n'y aurait rien de l'autre
+     cote. Une fois le jeu fini il RESTE, mais il change de nom : tous les
+     niveaux sont rejouables, il n'y avait aucune raison que le seul combat
+     qu'on ne puisse pas refaire soit le dernier.
+
+     Il est pose au BOUT de la base, plus loin que la carte : on passe donc
+     devant la boutique avant de l'atteindre, ce qui est exactement l'effet
+     voulu la premiere fois. */
+  { cle: 'portail', x: 1748,
+    get nom() { return partie.finalGagne ? 'Revanche' : 'Portail'; },
+    get sous() { return partie.finalGagne ? 'Refaire le combat final' : 'Le monde réel'; },
+    condition: () => partie.manoirFait },
 ];
 
 /* Les postes reellement presents. Un poste conditionnel ne doit etre ni

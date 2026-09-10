@@ -121,6 +121,19 @@ function deplacerY(dt) {
 /* --- Simulation ---------------------------------------------------------- */
 
 function majBrad(dt) {
+  /* PENDANT UNE SCENE, LE JOUEUR NE JOUE PLUS.
+
+     Les trois secondes qui suivent le dernier coup porte a Kirby 67 sont une
+     mise en scene, pas du jeu : laisser Brad courir et frapper dedans
+     donnerait l'impression que le combat continue alors qu'il est fini. On
+     relache tout, y compris les fronts d'appui, a chaque image. */
+  if (typeof arene !== 'undefined' && arene.finManoir > 0) {
+    relacherTout();
+    sautPresseCeTick = false;
+    attaquePresseeCeTick = false;
+    ondePresseeCeTick = false;
+  }
+
   // Fin de niveau : Brad marche seul vers la porte, le joueur ne controle plus.
   const dir = brad.scenarise > 0
     ? 1
@@ -450,6 +463,7 @@ function terminerNiveau() {
   bilan.premiere = !niveauTermine(niveauCourant);
 
   partie.pieces += brad.pieces + bilan.prime;
+  partie.piecesGagnees += brad.pieces + bilan.prime;   // cumule, jamais depense
   partie.tempsJoue += chrono;
   if (bilan.premiere) partie.termines.push(niveauCourant);
   enregistrerPartie();
@@ -707,6 +721,16 @@ function reinitialiserEnnemis(complet) {
    mecanique du combat serait divisee par quatre comme le reste. */
 function blesserEnnemi(e, degats, sensPoussee, ignoreInvulnerabilite, ignoreResistance) {
   if (e.etat === 'mort') return;
+
+  /* UN COMBAT TERMINE NE SE POURSUIT PAS.
+
+     Kirby 67 reste debout, a genoux, pendant les trois secondes qui separent le
+     dernier coup de la cinematique. Les commandes sont relachees a ce
+     moment-la, mais cela ne suffit pas : une zone d'attaque encore ouverte, un
+     saut deja lance, ou n'importe quel appel exterieur pouvaient encore lui
+     retirer des points de vie — et le TUER, alors que toute la suite de
+     l'histoire repose sur le fait qu'il se releve. */
+  if (e.aGenoux) return;
 
   /* Une copie du Seraphin ne se blesse pas : on la DESIGNE. Toucher la bonne
      assomme le geant, toucher une fausse la creve et brouille le melange.

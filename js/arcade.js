@@ -239,7 +239,10 @@ function finirArcade(raison) {
   arcade.etat = 'fini';
   arcade.message = raison;
   arcade.bcGagnes = Math.floor(arcade.score / ARC.ptsParBC);
-  if (arcade.bcGagnes > 0) partie.pieces += arcade.bcGagnes;
+  if (arcade.bcGagnes > 0) {
+    partie.pieces += arcade.bcGagnes;
+    partie.piecesGagnees += arcade.bcGagnes;
+  }
   if (arcade.score > partie.meilleurArcade) partie.meilleurArcade = arcade.score;
   enregistrerPartie();
   audio.bruit('mort');

@@ -1907,6 +1907,14 @@ function dessinerEnnemis() {
        qui evite un chemin de rendu separe pour un seul ennemi. */
     if (e.t.planche) {
       const p = posePlanche(e);
+      /* A GENOUX. Kirby 67 reste debout dans la planche — il n'a pas d'image
+         de defaite. On l'ecrase donc verticalement et on le descend d'autant :
+         trois lignes de code plutot qu'une treizieme cellule a dessiner, et le
+         resultat se lit sans ambiguite le temps des trois secondes de fin. */
+      if (e.aGenoux) {
+        ctx.scale(1, 0.72);
+        ctx.translate(0, 13);
+      }
       const { cw, ch, piedsDansCellule } = BRAD_PLANCHE;
       ctx.drawImage(source, p.colonne * cw, p.ligne * ch, cw, ch,
                     -cw / 2, -piedsDansCellule, cw, ch);
@@ -2405,6 +2413,9 @@ function rendreNiveau() {
   // par-dessus tout le monde, les lueurs des copies par-dessus le voile.
   dessinerObscurite();
   dessinerLueursArene();
+  // Le voile de fin du manoir : il ferme la scene avant que la cinematique ne
+  // prenne la main, pour que la coupure ne se voie pas.
+  dessinerFinManoir();
   ctx.restore();
 
   hud();
@@ -2434,6 +2445,7 @@ function rendu() {
     case 'chargement': dessinerChargement(); break;
     case 'pret':      dessinerPret(); break;
     case 'final':     dessinerFinal(); break;
+    case 'generique': dessinerGenerique(); break;
     case 'jeu':       rendreNiveau(); break;
     case 'mort':      rendreNiveau(); ecranDeMort(); break;
     case 'fin':       rendreNiveau(); dessinerFinNiveau(); break;
@@ -2501,6 +2513,10 @@ function boucle(maintenant) {
     } else if (scene === 'menu' || scene === 'options' || scene === 'credits'
                || scene === 'difficulte') {
       majDemo(PAS);
+      // Les confettis du menu, une fois le jeu termine. Ils vivent dans
+      // js/generique.js : c'est le generique qui les invente, le menu ne fait
+      // que les laisser retomber.
+      majConfettis(PAS);
       if (messageMenuT > 0) messageMenuT -= PAS;
     } else if (scene === 'dialogue') {
       majDialogue(PAS);
@@ -2518,6 +2534,8 @@ function boucle(maintenant) {
       majJukebox(PAS);
     } else if (scene === 'chargement') {
       majChargement(PAS);
+    } else if (scene === 'generique') {
+      majGenerique(PAS);
     } else if (scene === 'final') {
       // Le combat final a sa propre simulation, complete et separee : voir
       // l'en-tete de js/final.js pour la raison.
@@ -2684,10 +2702,12 @@ document.getElementById('tp-hub').onclick = () => {
   entrerHub(false);
 };
 document.getElementById('tp-bc').onclick = () => {
-  partie.pieces += 100; enregistrerPartie(); audio.bruit('piece');
+  partie.pieces += 100; partie.piecesGagnees += 100;
+  enregistrerPartie(); audio.bruit('piece');
 };
 document.getElementById('tp-bcs').onclick = () => {
   partie.piecesSecretes = (partie.piecesSecretes || 0) + 1;
+  partie.secretsTrouves = (partie.secretsTrouves || 0) + 1;
   decouvrirSecrets();
   enregistrerPartie();
   audio.bruit('victoire');

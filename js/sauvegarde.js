@@ -183,6 +183,12 @@ const partie = {
   objets: [],                   // pieces de l'appareil a raclette recuperees
   bossVaincus: [],              // ids des niveaux dont le boss est tombe
   piecesSecretes: 0,            // Brad Coins secrets en poche
+  /* Deux compteurs CUMULES, distincts des deux porte-monnaie ci-dessus. Le
+     generique affiche « gagnes » et « trouves » : sans eux il aurait affiche
+     ce qui RESTE, et une partie ou l'on a tout depense en boutique se serait
+     racontee comme une partie ou l'on n'a rien ramasse. */
+  piecesGagnees: 0,             // total de Brad Coins ramasses depuis le debut
+  secretsTrouves: 0,            // total de Brad Coins secrets trouves
   secretsVus: false,            // la section Secrets de la boutique est ouverte
   secrets: [],                  // ameliorations secretes achetees
   maj: 0,
@@ -259,7 +265,7 @@ function chargerPartie() {
     // On ne relit que les cles connues : une sauvegarde ancienne reste
     // valable quand de nouveaux champs apparaissent.
     ['pieces', 'tempsJoue', 'ennemisTotal', 'meilleurArcade', 'arcadeParties',
-     'entrainements', 'piecesSecretes', 'maj']
+     'entrainements', 'piecesSecretes', 'piecesGagnees', 'secretsTrouves', 'maj']
       .forEach(k => { if (typeof brut[k] === 'number') partie[k] = brut[k]; });
     if (typeof brut.secretsVus === 'boolean') partie.secretsVus = brut.secretsVus;
     if (Array.isArray(brut.secrets)) {
@@ -312,6 +318,8 @@ function effacerPartie() {
   try { localStorage.removeItem(CLE_SAUVEGARDE); } catch (e) { /* ignore */ }
   partie.existe = false;
   partie.pieces = 0;
+  partie.piecesGagnees = 0;
+  partie.secretsTrouves = 0;
   partie.tempsJoue = 0;
   partie.ennemisTotal = 0;
   partie.meilleurArcade = 0;

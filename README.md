@@ -1,4 +1,4 @@
-# Brad Bitt, mais le jeu — prototype 10
+# Brad Bitt, mais le jeu — prototype 17
 
 Le niveau d'introduction devient un vrai parcours, avec tout ce qui l'entoure :
 écran d'accueil, animation des studios, menu jouable, musique, sauvegarde et
@@ -1872,3 +1872,192 @@ converti en `.m4a` + `.mp3`.
 
 Rien, pour ce jeu. Il a un début, dix niveaux, quatre mini-boss, un boss final
 et une fin. Le reste, c'est le kart.
+
+---
+
+# Prototype 17 — deux corrections, et le générique
+
+## Les deux corrections demandées
+
+### 1. La fin du combat du manoir était brutale
+
+**C'était vrai.** Le dernier coup de poing et la boîte de dialogue tombaient
+sur la **même image** : rien entre les deux. On frappait, et on lisait.
+
+Il y a maintenant **trois secondes** entre les deux, et elles sont occupées :
+
+| moment | ce qui se passe |
+|--------|-----------------|
+| 0,0 s | Kirby 67 tombe à genoux, la musique s'arrête en fondu (1,4 s), l'écran tremble |
+| 0,0 → 2,6 s | le bandeau **« KIRBY 67 EST À GENOUX »** |
+| 0,0 → 3,0 s | la garde encore debout quitte la salle, les meules disparaissent |
+| 1,6 → 3,0 s | l'écran se ferme au noir |
+| 3,0 s | la cinématique prend la main, écran déjà noir |
+
+Pendant ces trois secondes **les commandes ne répondent plus** — volontairement.
+Sans ça, Brad continuait de courir et de frapper sous le bandeau, ce qui
+ressemblait à un bug plutôt qu'à une fin de combat.
+
+Une conséquence à laquelle je ne m'attendais pas : **Kirby 67 à genoux pouvait
+encore être tué**. Un coup en retard, une meule encore en vol, et il tombait à
+0 PV — alors qu'il doit se relever pour faire exploser le manoir. `blesserEnnemi`
+refuse maintenant tout dégât à un ennemi à genoux.
+
+### 2. Le jeu ne répondait plus après le combat final
+
+**C'était un vrai bug, et il était grave** : gagner le jeu l'empêchait de
+continuer.
+
+La cause exacte. Le décompte qui lance la fin (`attenteFin`) vivait dans
+`majOndesFinales`, appelée **après** cette ligne :
+
+```js
+if (finale.fini || finale.mort) return;
+```
+
+Kirby 67 abattu, `finale.fini` passait à `true` — et la fonction qui devait
+compter les trois dernières secondes n'était plus jamais atteinte. Le décompte
+restait figé, `terminerLeJeu()` n'était jamais appelé, et l'arène gardait la
+main pour toujours.
+
+Le décompte est maintenant dans `majMinuteursFinal(dt)`, appelée depuis une
+branche dédiée à `finale.fini` : la simulation s'arrête, le décompte continue,
+la caméra glisse doucement de Brad vers Kirby. C'est **exactement la même faute**
+que celle du manoir un an de code plus tôt : *un compteur placé derrière un
+`return` ne compte plus.* Les deux sont maintenant devant.
+
+## Le générique
+
+Il se joue quand la dernière cinématique s'achève, et il suit ta liste dans ton
+ordre. **Pas de défilement** : une catégorie occupe l'écran, s'efface, la
+suivante arrive.
+
+| s | catégorie | contenu |
+|---|-----------|---------|
+| 1,5 | Idée originale de | IMAGINe Studio |
+| 9,5 | Développement | HwR Engine |
+| 17,5 | Échantillons de musiques par | Mixvibes |
+| 25,5 | Musique | lılyº |
+| 33,5 | **Propulsé par** | GitHub, puis Opus 5, puis Netlify — **le titre ne bouge pas** tant que les trois ne sont pas là |
+| 47 | L'univers Brad Bitt créé par | H.D.N |
+| 55 | Merci | à mes amis / pour leurs idées des plus farfelues |
+| 62 | *(carte de titre)* | BRAD BITT — mais le jeu |
+| **69** | **Voix de Brad Bitt** | **1 min 09**, comme demandé |
+| 80 | Le bestiaire | les douze Serra croisés en chemin |
+| 94 | Cette partie | tes chiffres à toi |
+| 106 | Une précision | la mention sur les agents conversationnels |
+| **122** | *(reprise)* | **2 min 02** : il ne reste que **MERCI D'AVOIR JOUÉ** |
+
+Les quatre cartes ajoutées (titre, bestiaire, statistiques, précision) sont là
+pour la raison que tu donnais : **tenir jusqu'à 1 min 09 sans étirer les
+premières**. Elles se retirent en supprimant leur ligne dans `CARTES`, en haut
+de `js/generique.js` — tout le générique se règle là, sans toucher au rendu.
+
+### Le calage sur la musique
+
+Dépose `assets/audio/generique.m4a` et **rien n'est à recalculer** : le jeu lit
+la durée réelle de la piste et fait finir le générique avec elle. Tant qu'elle
+manque, il dure 2 min 48 par défaut. Une piste tronquée ou illisible ne le
+raccourcit pas — c'est vérifié.
+
+### La fin
+
+Sur la dernière carte, deux boutons : **Menu principal** et **Retour à la base**.
+Sans rien toucher, la dernière note renvoie au menu. Espace saute directement à
+cette carte, mais **seulement avant la reprise** — après, il valide le bouton
+choisi.
+
+### Les confettis
+
+Ils tombent à l'arrivée sur le menu, et **à chaque lancement du jeu une fois
+terminé** — une seule bordée par session, pas à chaque aller-retour dans les
+options.
+
+## Trois chiffres qui mentaient
+
+La carte « Cette partie » lisait **le contenu des poches** là où elle annonce
+« gagnés » et « trouvés ». Une partie où l'on avait tout dépensé en boutique se
+racontait donc comme une partie où l'on n'avait rien ramassé. Deux compteurs
+cumulés (`piecesGagnees`, `secretsTrouves`) ont été ajoutés, et ils survivent
+aux achats.
+
+Le troisième : **le combat final ne comptait dans aucun temps de jeu**. Il n'est
+pas un niveau, il ne passe donc par aucun bilan de fin de niveau — ses minutes
+n'étaient additionnées nulle part. Elles le sont maintenant.
+
+## L'aspiration de Kirby 67 était impossible à fuir
+
+Trouvée en équilibrant, pas signalée — mais elle méritait d'être corrigée : la
+bannière disait **« IL ASPIRE — ÉLOIGNE-TOI »** alors que le jeu l'interdisait.
+L'aspiration tirait à **260 px/s** quand Brad court à 190, et elle mordait à
+chaque fenêtre d'invincibilité, soit 4 à 6 PV par aspiration.
+
+Trois changements : la traction passe à **165 px/s** (on recule, lentement, mais
+on recule) ; **l'esquive brise l'aspiration** ; et **une seule morsure par
+aspiration**. Le robot de test est passé de 7 victoires sur 8 à **8 sur 8**, en
+finissant avec 6 à 21 PV sur 24 au lieu de 3.
+
+## Vérification
+
+**242 vérifications, 0 échec.** Trente-six sont nouvelles :
+
+- la respiration du manoir dure plus de deux secondes, Kirby 67 y **reste
+  vivant, à genoux**, la salle se vide de sa garde, et **le joueur ne peut plus
+  agir** (moins de 2 px parcourus en une seconde de touches enfoncées) ;
+- la cinématique arrive **après**, jamais pendant ;
+- la fin du combat final **n'est plus figée** : elle arrive, mais pas
+  immédiatement — plus de 2,5 s de pause avant la boîte de dialogue ;
+- le générique se dessine de bout en bout sans une erreur, sur ses quinze
+  cartes ;
+- à 1 min 12 on est bien sur la carte de la voix, à 2 min 10 il ne reste que le
+  remerciement ;
+- les deux boutons renvoient où il faut, et **ne rien faire** renvoie au menu à
+  la dernière note ;
+- Espace saute à la fin **avant** la reprise, et valide **après** ;
+- sans piste, le générique garde sa durée de repli ; une piste tronquée ne le
+  raccourcit pas ; une vraie piste commande la durée ;
+- pas de confettis avant d'avoir fini le jeu, des confettis après, **une seule
+  bordée par lancement**, et ils finissent par disparaître ;
+- les Brad Coins gagnés et les secrets trouvés **survivent à la boutique** ;
+- le combat final compte dans le temps de jeu.
+
+Le vérificateur de géométrie passe sur les douze niveaux. Les six traversées
+robot et celle du manoir passent aussi.
+
+## Une anomalie de robot, pas de jeu
+
+La passe exploratoire signale « traversée niveau3 : temps écoulé ». **Ce n'est
+pas un défaut du niveau**, et je l'ai reproduit avant de le dire : le robot
+court tout droit et saute un trou au moment précis où un **Serra-Boost** charge
+dans sa direction. Il le prend en pleine course au-dessus du vide, se fait
+repousser vers l'arrière et tombe. Les niveaux 1 et 2 échouent de la même façon,
+au même genre d'endroit. Un joueur voit la charge arriver ; le robot, non.
+
+Je ne l'ai pas « corrigé » : il n'y a rien à corriger dans les niveaux. Je le
+signale pour que le rapport de la passe exploratoire soit lisible.
+
+## Les musiques
+
+Six manquent, toutes déclarées et attendues sous ces noms :
+
+| fichier attendu | à quel moment |
+|-----------------|---------------|
+| `assets/audio/niveau8.m4a`  | le complexe scientifique |
+| `assets/audio/niveau9.m4a`  | la lune |
+| `assets/audio/niveau10.m4a` | le manoir de Kirby 67 |
+| `assets/audio/mini-kirby.m4a` | le premier combat, salle du trône |
+| `assets/audio/mega-kirby.m4a` | le combat final, à Lille |
+| `assets/audio/generique.m4a` | **le générique** |
+
+Le menu principal les signale (« 6 pistes audio introuvables ») au lieu de se
+taire. Dépose-les sous ces noms, ou envoie-les-moi et je te renvoie le lot
+converti en `.m4a` + `.mp3`.
+
+## Deux choses à me dire
+
+1. **« Voix de Brad Bitt : Brad Bitt (lui-même) »** est un gag de remplacement.
+   Donne-moi le vrai nom et je le change — c'est une ligne dans `CARTES`.
+2. Le **bandeau de mise au point** en bas de l'écran (`vx 0 · saut 74px · sol ·
+   ennemis 1/1 · 60fps`) s'affiche toujours pendant le jeu. Il est utile pour
+   déboguer, mais il n'a rien à faire dans une version jouable. Je peux le
+   passer sous F1 avec le reste — dis-moi.

@@ -189,6 +189,7 @@ const arene = {
   meules: [],           // {x, y, vx, r, rot}
   repos: 0,             // avant le prochain geste de Kirby 67
   gardes: 0,            // vagues de garde deja appelees
+  finManoir: 0,         // respiration entre le dernier coup et la cinematique
 };
 
 function reinitialiserArene() {
@@ -231,6 +232,7 @@ function reinitialiserArene() {
   arene.meules = [];
   arene.repos = 2.0;
   arene.gardes = 0;
+  arene.finManoir = 0;
 }
 
 /* La sortie du niveau reste verrouillee tant qu'un boss vit encore : un niveau
@@ -308,6 +310,19 @@ function majArene(dt) {
      qui reste une transition continue et non un interrupteur. */
   if (arene.finie || !arene.active) arene.noirceurCible = 0;
   arene.noirceur += (arene.noirceurCible - arene.noirceur) * Math.min(1, 3.6 * dt);
+
+  /* La respiration de fin du manoir. Elle est posee ICI, avant tous les retours
+     anticipes, pour la meme raison que l'obscurite et le retour de musique :
+     `arene.active` est deja faux a ce moment-la, et un minuteur place plus bas
+     ne serait jamais decremente. C'est exactement l'erreur qui figeait le
+     combat final. */
+  if (arene.finManoir > 0) {
+    arene.finManoir -= dt;
+    if (arene.finManoir <= 0) {
+      arene.finManoir = 0;
+      if (typeof lancerFinDuManoir === 'function') lancerFinDuManoir();
+    }
+  }
 
   // Le retour de la musique du niveau, apres la fanfare de victoire.
   if (arene.retourMusique > 0) {
@@ -876,8 +891,27 @@ function majKirby(b, dt) {
   poser();
 }
 
-/* Fin du premier combat. Le boss reste debout, la salle se vide, et la
-   cinematique prend la main — elle vit dans js/dialogue.js. */
+/* -----------------------------------------------------------------------------
+   FIN DU PREMIER COMBAT, ET SA RESPIRATION
+
+   Cette fonction appelait la cinematique SUR LA MEME IMAGE que le dernier coup.
+   On passait donc d'une salle du trone en plein combat a une boite de dialogue
+   sur fond noir en un seizieme de seconde, sans que rien ne dise que le combat
+   venait de se terminer. C'etait brutal, et c'etait signale.
+
+   Elle pose desormais un MINUTEUR au lieu d'enchainer. Pendant ces trois
+   secondes :
+
+     - le combat s'arrete pour de bon (plus de meules, plus de gardes) ;
+     - Kirby 67 reste debout, a genoux, et la camera se pose sur lui ;
+     - l'ecran se ferme en fondu, lentement.
+
+   Le minuteur est tenu par majArene(), qui tourne meme une fois le combat
+   fini — c'est exactement le detail dont l'oubli avait fige le combat final.
+-------------------------------------------------------------------------- */
+
+const DUREE_FIN_MANOIR = 3.0;
+
 function terminerCombatManoir(b) {
   arene.finie = true;
   arene.active = false;
@@ -886,6 +920,7 @@ function terminerCombatManoir(b) {
   b.pv = Math.max(1, KIRBY.finCombat);
   b.vx = 0;
   b.prepareT = 0; b.chargeT = 0;
+  b.aGenoux = true;                 // le rendu l'affaisse le temps de la scene
 
   // Les gardes encore debout s'evanouissent : la scene qui suit doit etre a
   // deux personnages, pas a sept.
@@ -896,9 +931,27 @@ function terminerCombatManoir(b) {
   }
   arene.sbires = [];
 
-  audio.arreterMusique(0.5);
+  audio.arreterMusique(1.4);        // la musique se retire, elle ne se coupe pas
   secousse(10, 0.7);
-  if (typeof lancerFinDuManoir === 'function') lancerFinDuManoir();
+  annoncerArene('KIRBY 67 EST À GENOUX', 2.6);
+  arene.finManoir = DUREE_FIN_MANOIR;
+
+  // Brad aussi s'arrete de jouer : la scene ne lui appartient plus.
+  brad.vx = 0;
+  brad.invincible = Math.max(brad.invincible, DUREE_FIN_MANOIR + 1);
+  relacherTout();
+}
+
+/* Le voile de fin du manoir, dessine par-dessus le niveau. Il monte jusqu'au
+   noir complet sur la derniere seconde : quand la cinematique prend la main,
+   l'ecran est deja noir et la coupure ne se voit pas. */
+function dessinerFinManoir() {
+  if (!ARENE || !(arene.finManoir > 0)) return;
+  const reste = arene.finManoir;
+  const a = reste > 1.4 ? 0 : 1 - reste / 1.4;
+  if (a <= 0) return;
+  ctx.fillStyle = 'rgba(0,0,0,' + a.toFixed(3) + ')';
+  ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
 }
 
 /* Les meules, dessinees. Une roue de serrano vue de face : croute plus sombre,
@@ -1658,6 +1711,7 @@ let premierSecret = false;
 
 function prendrePieceSecrete() {
   partie.piecesSecretes = (partie.piecesSecretes || 0) + 1;
+  partie.secretsTrouves = (partie.secretsTrouves || 0) + 1;   // cumule
   const premiere = decouvrirSecrets();
   enregistrerPartie();
 

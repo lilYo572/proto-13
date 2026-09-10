@@ -680,6 +680,10 @@ function cadre(x, y, w, h) {
 
 function dessinerMenu() {
   dessinerDemo();
+  /* Une fois le jeu termine, des confettis a chaque lancement. L'appel est
+     garde par un drapeau de session : sans lui, revenir des options en
+     relancerait une bordee a chaque image. */
+  confettisDuMenu();
 
   texteCentre('BRAD BITT', 66, 'bold 34px system-ui, sans-serif', '#f2f3f8');
   texteCentre('mais le jeu', 90, 'italic 14px system-ui, sans-serif', '#e8b62c');
@@ -1129,6 +1133,7 @@ function activerZone(z) {
     case 'menu-retour': retourAuMenu(); break;
     case 'relancer-mort': relancerApresMort(); break;
     case 'rejouer-final': demarrerCombatFinal(false); break;
+    case 'generique':   generique.choix = z.valeur; validerGenerique(); break;
     case 'mort-hub':    audio.arreterMusique(0.5); entrerHub(false); break;
     case 'aller-hub':   rentrerALaBase(); break;
     case 'difficulte':    indexDifficulte = z.valeur; audio.bruit('menu'); break;

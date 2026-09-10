@@ -121,7 +121,23 @@ const F_DUREE_ONDE = 0.7;
 
 const F_PV_KIRBY = 3;
 const F_REPOS = [2.4, 1.9, 1.4];         // entre deux attaques, par phase
-const F_ASPIRATION = { duree: 1.7, force: 260, degats: 2 };
+/* L'ASPIRATION, ET POURQUOI ELLE N'ASPIRE PLUS SI FORT.
+
+   Elle tirait a 260 px/s. Brad court a 190 lateralement : la fuite etait donc
+   arithmetiquement impossible, et le bandeau « ÉLOIGNE-TOI » demandait quelque
+   chose que le jeu interdisait. Pire, les degats se declenchaient tant que la
+   distance restait courte — deux fois par aspiration une fois l'invincibilite
+   ecoulee, soit quatre a six points de vie pour une attaque qu'on ne pouvait
+   pas eviter.
+
+   A 165 px/s, courir a contresens fait gagner du terrain, lentement : on s'en
+   sort en abandonnant tout le reste pendant deux secondes, ce qui est
+   exactement le prix qu'une attaque doit couter. L'esquive, elle, la brise d'un
+   coup. Et la morsure ne compte qu'UNE FOIS par aspiration.
+
+   Le manoir enseigne deja cette regle : la-bas elle tire a 230 contre 250 de
+   course. Les deux combats disent donc la meme chose. */
+const F_ASPIRATION = { duree: 1.7, force: 165, degats: 2 };
 const F_CHARGE = { preparation: 0.9, vitesse: 520, duree: 0.85, degats: 3 };
 const F_PLUIE = { annonce: 1.4, degats: 2, rayon: 40, nombre: [0, 0, 4] };
 const F_VAGUES = [
@@ -272,8 +288,39 @@ function majFinal(dt) {
   if (finale.banniere > 0) finale.banniere -= dt;
   if (finale.secousse > 0) finale.secousse -= dt;
 
-  if (finale.fini || finale.mort) { esquivePresseeCeTick = false; coupPresseCeTick = false;
-                                    ondeFinalePresseeCeTick = false; return; }
+  /* LE BUG QUI FIGEAIT LE JEU A LA VICTOIRE.
+
+     Ce garde-fou arretait TOUTE la simulation des que le combat etait gagne —
+     y compris `majOndesFinales`, qui porte le compte a rebours menant a la
+     cinematique de fin. Le compteur n'etait donc jamais decremente,
+     `terminerLeJeu()` n'etait jamais appele, et l'ecran restait bloque sur une
+     place ou plus rien ne repondait. Le joueur qui gagnait le jeu se retrouvait
+     coince dedans.
+
+     La regle est desormais separee en deux : le COMBAT s'arrete, mais ce qui
+     fait AVANCER LA SCENE — les compteurs, les particules, la camera — continue
+     de tourner. C'est d'ailleurs ce qui permet a la victoire de respirer trois
+     secondes avant la cinematique. */
+  if (finale.mort) {
+    esquivePresseeCeTick = false;
+    coupPresseCeTick = false;
+    ondeFinalePresseeCeTick = false;
+    return;
+  }
+
+  if (finale.fini) {
+    majMinuteursFinal(dt);
+    // Kirby 67 reste a terre, mais la camera se pose doucement sur lui : c'est
+    // lui qu'on regarde tomber, pas le vide autour.
+    const viseFin = finale.brad.x * 0.4 + finale.kirby.x * 0.6;
+    finale.cam += (Math.max(-F_ARENE_X * 0.5,
+                   Math.min(F_ARENE_X * 0.5, viseFin)) - finale.cam)
+                  * Math.min(1, 1.6 * dt);
+    esquivePresseeCeTick = false;
+    coupPresseCeTick = false;
+    ondeFinalePresseeCeTick = false;
+    return;
+  }
 
   majBradFinal(dt);
   majKirbyFinal(dt);
@@ -513,9 +560,15 @@ function majKirbyFinal(dt) {
       if (k.tEtat > 0) {
         const dx = k.x - b.x, dz = k.z - b.z;
         const d = Math.hypot(dx, dz) || 1;
-        b.x += (dx / d) * F_ASPIRATION.force * dt;
-        b.z += (dz / d) * F_ASPIRATION.force * dt;
-        if (d < 46) blesserBradFinal(F_ASPIRATION.degats, k.x, 'l\'aspiration');
+        // L'esquive brise l'aspiration : c'est sa contre-mesure immediate.
+        if (b.esquiveT <= 0) {
+          b.x += (dx / d) * F_ASPIRATION.force * dt;
+          b.z += (dz / d) * F_ASPIRATION.force * dt;
+        }
+        if (d < 46 && !k.aMordu) {
+          k.aMordu = true;
+          blesserBradFinal(F_ASPIRATION.degats, k.x, 'l\'aspiration');
+        }
       } else {
         k.etat = 'repos';
         k.repos = F_REPOS[k.phase];
@@ -592,6 +645,7 @@ function choisirAttaqueFinale(k, b) {
 
   if (choix === 'aspiration') {
     k.etat = 'aspire';
+    k.aMordu = false;               // une seule morsure par aspiration
     k.tEtat = F_ASPIRATION.duree;
     audio.bruit('onde');
     annoncerFinal('IL ASPIRE — ÉLOIGNE-TOI', 1.8);
@@ -703,13 +757,18 @@ function majOndesFinales(dt) {
     finale.ondes[i].t -= dt;
     if (finale.ondes[i].t <= 0) finale.ondes.splice(i, 1);
   }
-  if (finale.attenteFin > 0) {
-    finale.attenteFin -= dt;
-    if (finale.attenteFin <= 0) {
-      finale.attenteFin = 0;
-      if (typeof terminerLeJeu === 'function') terminerLeJeu();
-    }
-  }
+}
+
+/* Ce qui doit continuer de tourner meme quand le combat est fini : les ondes
+   encore visibles, et le compte a rebours vers la cinematique. Separe du reste
+   pour que la victoire ne puisse plus geler la scene. */
+function majMinuteursFinal(dt) {
+  majOndesFinales(dt);
+  if (!(finale.attenteFin > 0)) return;
+  finale.attenteFin -= dt;
+  if (finale.attenteFin > 0) return;
+  finale.attenteFin = 0;
+  if (typeof terminerLeJeu === 'function') terminerLeJeu();
 }
 
 /* --- Effets legers -------------------------------------------------------- */

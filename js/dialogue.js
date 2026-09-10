@@ -1068,6 +1068,17 @@ function lancerFinDuManoir() {
       dernier avertissement du jeu, et elle a un but precis : rappeler qu'il
       reste peut-etre des Brad Coins a depenser. */
 function ouvrirPortailFinal() {
+  /* Une revanche ne se demande pas deux fois. La grande question — celle qui
+     rappelle qu'il reste des Brad Coins a depenser — n'a de sens que la
+     premiere fois ; la reposer a chaque rematch la userait. */
+  if (partie.finalGagne) {
+    demanderConfirmation(
+      'Retourner à Lille pour un dernier tour ? Kirby 67 t\'y attend, avec ses '
+      + 'trois points de vie et sa mauvaise humeur.',
+      () => { audio.arreterMusique(0.6); demarrerCombatFinal(true); });
+    return;
+  }
+
   const reste = partie.pieces;
   const rappel = reste >= 30
     ? ' Il te reste ' + reste + ' Brad Coins. De l\'autre côté, ils ne valent plus rien.'
@@ -1084,12 +1095,16 @@ function ouvrirPortailFinal() {
 /* 4. Kirby 67 est a terre pour de bon. */
 function terminerLeJeu() {
   partie.finalGagne = true;
+  /* Le combat final n'est pas un niveau : il ne passe donc jamais par le bilan
+     qui ajoute le chrono au temps de jeu. Sans cette ligne, le generique
+     raconterait une partie ou le dernier combat n'aurait pas eu lieu. */
+  if (typeof finale === 'object' && finale.t > 0) partie.tempsJoue += finale.t;
   enregistrerPartie();
-  lancerDialogue(DIALOGUE_VICTOIRE, () => {
-    entrerHub(false);
-    braddyDit('Nous avons gagné, Brad. J\'ouvre un nouveau tableau. Celui-ci, '
-            + 'personne ne me l\'a demandé non plus.');
-  });
+  /* La derniere cinematique, puis le GENERIQUE. On ne repasse pas par la base :
+     le joueur y retournera s'il le veut, depuis le generique. Le renvoyer
+     d'office a un comptoir de boutique juste apres la fin du jeu serait la
+     pire chute possible. */
+  lancerDialogue(DIALOGUE_VICTOIRE, lancerGenerique);
 }
 
 /* Ce qu'il dit au retour d'un niveau ou une piece vient d'etre ramassee : ça

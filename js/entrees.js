@@ -258,6 +258,16 @@ addEventListener('keydown', e => {
       return;
     }
 
+    /* Le generique. Trois touches seulement : valider (passer a la fin, puis
+       choisir), les fleches pour choisir, et Echap qui renvoie au menu. */
+    case 'generique':
+      if (annuler) { quitterGenerique('menu'); return; }
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' ||
+          lettre === 'q' || lettre === 'd' || lettre === 'a') {
+        deplacerGenerique(e.code === 'ArrowLeft' || lettre === 'q' || lettre === 'a' ? -1 : 1);
+      } else if (valider) validerGenerique();
+      return;
+
     case 'pret':
       if (valider) commencerNiveau();
       else if (annuler) retourAuMenu();
