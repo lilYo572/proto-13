@@ -53,7 +53,7 @@ evaluerDansBac(
   ['js/reglages.js', 'niveaux/intro.js', 'niveaux/niveau1.js',
    'niveaux/niveau2.js', 'niveaux/niveau3.js', 'niveaux/niveau4.js',
    'niveaux/niveau5.js', 'niveaux/niveau6.js', 'niveaux/niveau7.js',
-   'niveaux/niveau8.js', 'niveaux/niveau9.js',
+   'niveaux/niveau8.js', 'niveaux/niveau9.js', 'niveaux/niveau10.js',
    'niveaux/entrainement.js'],
   bac, 'this.SCHEMA = SCHEMA;');
 

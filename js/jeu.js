@@ -241,6 +241,16 @@ function fond() {
       dessinerTerreAuLoin(0.06);
       dessinerCrateres(0.34, 302, z.pres);
       break;
+    case 'parc-honneur':
+      dessinerFacadeManoir(0.12, 300, z.loin);
+      dessinerJardinFrancais(0.4, 304, z.pres);
+      break;
+    case 'galerie':
+      dessinerGalerie(0.16, 306, z.loin);
+      break;
+    case 'trone':
+      dessinerSalleDuTrone(0.14, 306, z.loin);
+      break;
     default:
       dessinerTuyaux(0.22, z.loin);
       dessinerCollines(0.42, 292, 46, z.pres);
@@ -1033,6 +1043,282 @@ function dessinerCrateres(facteur, baseY, couleur) {
   }
 }
 
+/* =============================================================================
+   NIVEAU 10 — LE MANOIR DE KIRBY 67
+
+   CE QUI LE SEPARE DU MANOIR HANTE DU NIVEAU 6, ET POURQUOI
+
+   Le niveau 6 est un manoir ABANDONNE : bois sombre, portraits de travers,
+   toiles d'araignee, une palette violette et froide, et pas une seule lumiere
+   franche. Celui-ci est HABITE et il est riche. Trois regles s'en deduisent, et
+   elles suffisent a ce que les deux ne se ressemblent jamais :
+
+     1. il est ECLAIRE. Lustres, appliques, vitrines : la lumiere vient de
+        partout au lieu de manquer partout ;
+     2. sa palette est CHAUDE et minerale — marbre creme, or, bordeaux — la ou
+        le niveau 6 est violet et bois ;
+     3. tout y est ALIGNE. Le manoir hante est de travers, celui-ci est
+        symetrique au pixel pres : jardin a la francaise, colonnes regulieres,
+        vitrines espacees de la meme distance. C'est ce qui donne le « chic ».
+
+   Et partout, du serrano expose comme un trophee de chasse.
+-------------------------------------------------------------------------- */
+
+/* La facade, vue du parc : trois etages de hautes fenetres eclairees, un
+   fronton, et le toit d'ardoise. */
+function dessinerFacadeManoir(facteur, baseY, couleur) {
+  const t = performance.now() / 1000;
+  for (const { idx, x } of rangeeDeFond(facteur, 340)) {
+    const H = 232;
+    // Le corps de logis
+    ctx.fillStyle = couleur;
+    ctx.fillRect(x, baseY - H, 300, H + HAUTEUR);
+    // Le toit a la Mansart, plus sombre
+    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    ctx.beginPath();
+    ctx.moveTo(x - 12, baseY - H);
+    ctx.lineTo(x + 40, baseY - H - 46);
+    ctx.lineTo(x + 260, baseY - H - 46);
+    ctx.lineTo(x + 312, baseY - H);
+    ctx.closePath();
+    ctx.fill();
+    // Le fronton central
+    ctx.fillStyle = 'rgba(255,236,190,.10)';
+    ctx.beginPath();
+    ctx.moveTo(x + 108, baseY - H);
+    ctx.lineTo(x + 150, baseY - H - 34);
+    ctx.lineTo(x + 192, baseY - H);
+    ctx.closePath();
+    ctx.fill();
+    // Les fenetres : trois rangees, toutes allumees, quelques-unes plus
+    // faiblement. Elles ne clignotent pas — on n'est pas dans une maison
+    // hantee, on est chez quelqu'un.
+    for (let rang = 0; rang < 3; rang++) {
+      for (let col = 0; col < 8; col++) {
+        const fx = x + 24 + col * 34;
+        const fy = baseY - H + 26 + rang * 62;
+        const chaud = 0.30 + 0.16 * Math.sin(t * 0.5 + idx + col * 1.7 + rang);
+        ctx.fillStyle = 'rgba(255,214,140,' + chaud.toFixed(2) + ')';
+        ctx.fillRect(fx, fy, 18, 40);
+        ctx.fillStyle = 'rgba(0,0,0,.30)';
+        ctx.fillRect(fx + 8, fy, 2, 40);
+        ctx.fillRect(fx, fy + 19, 18, 2);
+        // L'encadrement de pierre claire : c'est lui qui fait « chic ».
+        ctx.fillStyle = 'rgba(255,240,210,.14)';
+        ctx.fillRect(fx - 3, fy - 3, 24, 3);
+      }
+    }
+    // Le perron et sa marquise
+    ctx.fillStyle = 'rgba(255,240,210,.12)';
+    ctx.fillRect(x + 126, baseY - 74, 48, 74);
+    ctx.fillStyle = 'rgba(226,180,90,.35)';
+    ctx.fillRect(x + 120, baseY - 78, 60, 5);
+  }
+}
+
+/* Le jardin a la francaise : ifs taillés en cone, bassin, gravier clair. Tout
+   est espace regulierement — c'est la definition meme du jardin a la
+   francaise, et c'est ce qui oppose ce parc aux arbres morts du niveau 6. */
+function dessinerJardinFrancais(facteur, baseY, couleur) {
+  for (const { idx, x } of rangeeDeFond(facteur, 96)) {
+    /* Les cones etaient hauts de 46 a 58 px pour une base a 304 : leur pointe
+       arrivait a 246, soit quarante pixels au-dessus de la ligne de sol, et le
+       jardin se reduisait a une rangee de petits triangles. A 84-108 px ils
+       occupent enfin la place d'un if taille. */
+    const h = 84 + restePositif(idx * 13, 2) * 24;
+    // L'if en cone, sur sa vasque
+    ctx.fillStyle = couleur;
+    ctx.beginPath();
+    ctx.moveTo(x + 18, baseY - h - 14);
+    ctx.lineTo(x + 4, baseY - 8);
+    ctx.lineTo(x + 32, baseY - 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.07)';
+    ctx.beginPath();
+    ctx.moveTo(x + 18, baseY - h - 14);
+    ctx.lineTo(x + 12, baseY - 8);
+    ctx.lineTo(x + 18, baseY - 8);
+    ctx.closePath();
+    ctx.fill();
+    // La vasque de pierre
+    ctx.fillStyle = 'rgba(238,228,206,.22)';
+    ctx.fillRect(x + 8, baseY - 10, 20, 10);
+    ctx.fillRect(x + 5, baseY - 12, 26, 3);
+    // Une borne basse entre deux ifs : le rythme du parterre
+    ctx.fillStyle = 'rgba(238,228,206,.14)';
+    ctx.fillRect(x + 62, baseY - 16, 8, 16);
+    ctx.fillRect(x + 60, baseY - 19, 12, 4);
+  }
+}
+
+/* La galerie des trophees : colonnes de marbre, tapis rouge, et les vitrines
+   ou Kirby 67 expose ses meules. Le decor porte l'histoire du niveau — on
+   comprend ce que le personnage collectionne sans qu'un panneau le dise. */
+function dessinerGalerie(facteur, baseY, couleur) {
+  const t = performance.now() / 1000;
+  // Le mur du fond, en pierre claire, et sa plinthe.
+  ctx.fillStyle = couleur;
+  ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+  ctx.fillStyle = 'rgba(255,246,224,.05)';
+  ctx.fillRect(0, 0, LARGEUR, 60);
+
+  for (const { idx, x } of rangeeDeFond(facteur, 150)) {
+    // La colonne cannelee
+    ctx.fillStyle = 'rgba(246,238,220,.16)';
+    ctx.fillRect(x, baseY - 250, 30, 250);
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    for (let k = 0; k < 4; k++) ctx.fillRect(x + 5 + k * 6, baseY - 240, 2, 236);
+    // Chapiteau et base
+    ctx.fillStyle = 'rgba(246,238,220,.26)';
+    ctx.fillRect(x - 5, baseY - 258, 40, 10);
+    ctx.fillRect(x - 5, baseY - 12, 40, 12);
+
+    // La vitrine, entre deux colonnes : une meule de serrano sur son socle,
+    // sous une lumiere qui la detache du mur.
+    const vx = x + 62, vy = baseY - 148;
+    const g = ctx.createLinearGradient(vx + 22, vy, vx + 22, vy + 120);
+    g.addColorStop(0, 'rgba(255,226,160,.20)');
+    g.addColorStop(1, 'rgba(255,226,160,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(vx - 6, vy, 56, 120);
+    ctx.fillStyle = 'rgba(20,16,26,.5)';
+    ctx.fillRect(vx, vy + 10, 44, 100);
+    ctx.strokeStyle = 'rgba(226,180,90,.55)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(vx + 1, vy + 11, 42, 98);
+    // La meule, vue de trois quarts
+    const pulse = 0.72 + 0.1 * Math.sin(t * 0.9 + idx);
+    ctx.fillStyle = 'rgba(196,148,76,' + pulse.toFixed(2) + ')';
+    ctx.beginPath();
+    ctx.ellipse(vx + 22, vy + 62, 15, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(240,214,150,' + pulse.toFixed(2) + ')';
+    ctx.beginPath();
+    ctx.ellipse(vx + 22, vy + 58, 15, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(150,104,52,.8)';
+    ctx.fillRect(vx + 8, vy + 74, 28, 8);
+    // La petite plaque gravee, illisible et c'est tres bien ainsi
+    ctx.fillStyle = 'rgba(226,180,90,.4)';
+    ctx.fillRect(vx + 12, vy + 90, 20, 4);
+  }
+
+  // Le tapis rouge, en bas, qui court sur toute la galerie.
+  ctx.fillStyle = 'rgba(122,26,38,.55)';
+  ctx.fillRect(0, baseY - 6, LARGEUR, 40);
+  ctx.fillStyle = 'rgba(226,180,90,.30)';
+  ctx.fillRect(0, baseY - 6, LARGEUR, 2);
+  ctx.fillRect(0, baseY + 26, LARGEUR, 2);
+}
+
+/* La salle du trone : l'emblème de Kirby 67 au fond — une meule dans une
+   couronne —, des lustres, et deux bannieres. C'est la piece ou tout le niveau
+   menait, elle doit se reconnaitre en une image. */
+function dessinerSalleDuTrone(facteur, baseY, couleur) {
+  const t = performance.now() / 1000;
+  ctx.fillStyle = couleur;
+  ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+
+  // Le grand vitrail du fond, fixe dans le monde : c'est un point de repere,
+  // pas un motif. Il se place au centre de l'arene du niveau.
+  const ex = Math.round(X_EMBLEME - cam.x * facteur);
+  if (ex > -220 && ex < LARGEUR + 220) {
+    const g = ctx.createRadialGradient(ex, 150, 20, ex, 150, 170);
+    g.addColorStop(0, 'rgba(255,214,130,.26)');
+    g.addColorStop(1, 'rgba(255,214,130,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(ex - 180, -40, 360, 380);
+
+    /* LA COURONNE. Premiere version : sept pointes tracees sur un arc de
+       cent-vingt pixels de rayon. A l'ecran elle ne se lisait pas comme une
+       couronne mais comme un SOLEIL — trop grande, trop de branches, et le
+       bandeau qui aurait du la fermer manquait. Une couronne se reconnait a
+       trois choses : un bandeau horizontal, cinq pointes, et une perle au
+       sommet de chacune. Les voici, en petit. */
+    const CY = 118;                       // le centre de l'embleme
+    ctx.fillStyle = 'rgba(226,180,90,.62)';
+    ctx.beginPath();
+    ctx.moveTo(ex - 52, CY + 6);
+    for (let k = 0; k < 5; k++) {
+      ctx.lineTo(ex - 52 + k * 26, CY - 6);
+      ctx.lineTo(ex - 39 + k * 26, CY - 34);
+      ctx.lineTo(ex - 26 + k * 26, CY - 6);
+    }
+    ctx.lineTo(ex + 52, CY + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(240,214,150,.7)';
+    ctx.fillRect(ex - 54, CY + 4, 108, 9);
+    for (let k = 0; k < 5; k++) {
+      ctx.beginPath();
+      ctx.arc(ex - 39 + k * 26, CY - 37, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // La meule, sous la couronne : c'est elle qu'il fait couronner.
+    ctx.fillStyle = 'rgba(196,148,76,.75)';
+    ctx.beginPath(); ctx.ellipse(ex, CY + 64, 40, 30, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(240,214,150,.85)';
+    ctx.beginPath(); ctx.ellipse(ex, CY + 58, 40, 28, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(150,104,52,.6)';
+    for (let k = 0; k < 5; k++) {
+      ctx.beginPath();
+      ctx.arc(ex - 24 + k * 12, CY + 54 + (k % 2) * 9, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Les deux bannieres qui l'encadrent
+    for (const s of [-1, 1]) {
+      const bx = ex + s * 158;
+      ctx.fillStyle = 'rgba(122,26,38,.5)';
+      ctx.fillRect(bx - 16, 46, 32, 168);
+      ctx.beginPath();
+      ctx.moveTo(bx - 16, 214); ctx.lineTo(bx, 236); ctx.lineTo(bx + 16, 214);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(226,180,90,.35)';
+      ctx.fillRect(bx - 16, 46, 32, 4);
+      ctx.beginPath(); ctx.arc(bx, 120, 9, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Les lustres, repetes : ils eclairent la salle et donnent son echelle.
+  for (const { idx, x } of rangeeDeFond(facteur, 168)) {
+    const cx = x + 84;
+    const oscillation = Math.sin(t * 0.7 + idx) * 2;
+    ctx.strokeStyle = 'rgba(226,180,90,.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx + oscillation, 54); ctx.stroke();
+    ctx.fillStyle = 'rgba(226,180,90,.45)';
+    ctx.beginPath();
+    ctx.ellipse(cx + oscillation, 60, 28, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (let k = 0; k < 5; k++) {
+      const bx = cx + oscillation - 22 + k * 11;
+      ctx.fillStyle = 'rgba(255,226,160,' + (0.5 + 0.25 * Math.sin(t * 3 + k + idx)).toFixed(2) + ')';
+      ctx.fillRect(bx - 1, 62, 3, 8);
+      const g = ctx.createRadialGradient(bx, 66, 2, bx, 66, 26);
+      g.addColorStop(0, 'rgba(255,226,160,.16)');
+      g.addColorStop(1, 'rgba(255,226,160,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(bx - 26, 40, 52, 52);
+    }
+  }
+
+  // Le parquet de marbre : deux tons alternes, en damier ecrase.
+  for (const { idx, x } of rangeeDeFond(facteur * 2.2, 48)) {
+    ctx.fillStyle = restePositif(idx, 2) ? 'rgba(255,246,224,.045)' : 'rgba(0,0,0,.10)';
+    ctx.fillRect(x, baseY - 6, 48, 40);
+  }
+}
+
+/* La position de l'embleme dans le repere des couches de fond. Voir le
+   commentaire de X_TOUR_EIFFEL : ce n'est pas une coordonnee du monde. Ici il
+   doit tomber au fond de l'arene, donc tard dans le niveau. */
+/* Le repere est celui des couches de fond (voir X_TOUR_EIFFEL), pas celui du
+   monde. 1048 place l'embleme au centre de l'ecran quand la camera est au
+   milieu de l'arene du trone — c'est-a-dire pendant tout le combat. */
+const X_EMBLEME = 1048;
+
 /* -----------------------------------------------------------------------------
    NIVEAU 8 — le tokamak
 
@@ -1615,7 +1901,18 @@ function dessinerEnnemis() {
     const source = e.flash > 0 ? silhouette(img)
                  : (e.t.teinte ? teinter(img, e.t.teinte) : img);
     ctx.globalAlpha = e.etat === 'mort' ? Math.max(0, e.minuteur / 0.32) : 1;
-    ctx.drawImage(source, -img.width / 2, -img.height);
+    /* Deux façons de lire une image d'ennemi. Les Serra sont des dessins
+       d'un seul tenant ; Kirby 67 est un PERSONNAGE, et sa planche a le meme
+       decoupage que celle de Brad. Le drapeau `planche` du type choisit, ce
+       qui evite un chemin de rendu separe pour un seul ennemi. */
+    if (e.t.planche) {
+      const p = posePlanche(e);
+      const { cw, ch, piedsDansCellule } = BRAD_PLANCHE;
+      ctx.drawImage(source, p.colonne * cw, p.ligne * ch, cw, ch,
+                    -cw / 2, -piedsDansCellule, cw, ch);
+    } else {
+      ctx.drawImage(source, -img.width / 2, -img.height);
+    }
     ctx.globalAlpha = 1;
     ctx.restore();
 
@@ -1678,6 +1975,17 @@ function poseBrad(a) {
   }
   const ligne = vitesse > R.vitesseMarche * 1.08 ? BRAD_PLANCHE.course : BRAD_PLANCHE.marche;
   return { ligne, colonne: Math.floor(a.phaseMarche) % 4 };
+}
+
+/* La pose d'un ennemi qui utilise une planche d'animation plutot qu'un dessin
+   unique. Meme logique que poseBrad(), mais lue sur un ennemi : on choisit la
+   rangee d'apres la vitesse, et la colonne d'apres la phase que le moteur fait
+   deja tourner pour tous les ennemis. Aucun compteur supplementaire a tenir. */
+function posePlanche(e) {
+  const v = Math.abs(e.vx);
+  if (v < 8) return { ligne: BRAD_PLANCHE.repos, colonne: Math.floor(e.phase * 1.4) % 4 };
+  const ligne = v > R.vitesseMarche * 0.9 ? BRAD_PLANCHE.course : BRAD_PLANCHE.marche;
+  return { ligne, colonne: Math.floor(e.phase * 2.6) % 4 };
 }
 
 function dessinerPlancheBrad(cx, bas, sens, etirement, pose) {
@@ -2087,9 +2395,11 @@ function rendreNiveau() {
   dessinerRamassages();
   dessinerEnnemis();
   dessinerBoules();
+  dessinerMeules();
   dessinerBrad();
   // Les rochers arrivent du ciel : ils passent devant tout le monde.
   dessinerAsteroides();
+  dessinerAspiration();
   dessinerEffets();
   // Le manoir qui s'eteint pendant le bonneteau du niveau 6 : le voile passe
   // par-dessus tout le monde, les lueurs des copies par-dessus le voile.
@@ -2123,6 +2433,7 @@ function rendu() {
     case 'pause':     dessinerPause(); break;
     case 'chargement': dessinerChargement(); break;
     case 'pret':      dessinerPret(); break;
+    case 'final':     dessinerFinal(); break;
     case 'jeu':       rendreNiveau(); break;
     case 'mort':      rendreNiveau(); ecranDeMort(); break;
     case 'fin':       rendreNiveau(); dessinerFinNiveau(); break;
@@ -2207,6 +2518,11 @@ function boucle(maintenant) {
       majJukebox(PAS);
     } else if (scene === 'chargement') {
       majChargement(PAS);
+    } else if (scene === 'final') {
+      // Le combat final a sa propre simulation, complete et separee : voir
+      // l'en-tete de js/final.js pour la raison.
+      majFinal(PAS);
+      majEffetsFinal(PAS);
     } else if (scene === 'pause') {
       // Le niveau est fige, mais le decor doit continuer de respirer sous le
       // voile : une image totalement immobile ressemble a un plantage.

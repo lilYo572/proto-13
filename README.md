@@ -1661,3 +1661,214 @@ chacun : aucun défaut.
 
 Le niveau 10 : le manoir de Kirby 67 et le combat final. C'est le dernier, et
 c'est le seul qui reste.
+
+
+---
+
+# Prototype 16 — le manoir de Kirby 67, et le combat final
+
+Le jeu a une fin.
+
+## Kirby 67, en pixels
+
+Sa planche **dérive de celle de Brad** : mêmes proportions, mêmes douze images,
+même trait, même cadence d'animation. Le dessiner à part aurait donné deux
+styles côte à côte — deux épaisseurs de contour, deux façons d'ombrer — et ils
+partagent l'écran pendant deux combats et cinq cinématiques.
+
+`tools/kirby_sprite.py` ne change que l'habillement : t-shirt cyan à manches
+courtes avec les avant-bras nus, jean bleu foncé, baskets claires, cheveux
+châtain foncé, barbe de trois jours. Le visage, la silhouette et les
+animations sont ceux de Brad.
+
+**Une précision sur la photo que tu m'as envoyée.** J'ai travaillé à partir de
+ta *description* — t-shirt cyan, jean bleu foncé, cheveux courts bruns, barbe —
+et pas du visage. Je ne peux pas confirmer de qui il s'agit sur cette image, et
+faire d'une personne réelle identifiable le méchant d'un jeu n'est pas quelque
+chose que je ferai. À 36 × 48 pixels, la différence est nulle à l'écran : ce
+sont la silhouette et les couleurs qui font le personnage.
+
+Trois corrections ont été nécessaires sur la recoloration, et elles disent
+toutes la même chose — **on ne peut pas repeindre une veste en t-shirt** :
+
+- classer les pixels par rôle (costume / chemise / cravate) conservait le
+  modelé du costume : revers, ouverture, plastron. Kirby 67 portait un *blazer*
+  cyan. Il a fallu repeindre par bande et supprimer le trait intérieur ;
+- les cheveux blonds et la peau éclairée des mains tombent dans la même
+  fourchette de couleur : sans borne de lignes, il avait les mains brunes ;
+- les mèches des tempes, elles, ne se distinguent pas de l'ombre de la joue par
+  la couleur. C'est leur **position** qui tranche : les quatre colonnes
+  extérieures de la tête.
+
+## Le niveau 10 : le manoir
+
+Trois zones — le parc d'honneur, la galerie des trophées, la salle du trône.
+Tu voulais qu'il ne ressemble pas au manoir hanté du niveau 6 ; trois règles
+suffisent à ce qu'ils ne se croisent jamais :
+
+|                | Niveau 6 (hanté)          | Niveau 10 (chic)            |
+|----------------|---------------------------|-----------------------------|
+| lumière        | elle manque partout       | lustres, appliques, vitrines |
+| palette        | violet, bois, froid       | marbre crème, or, bordeaux  |
+| composition    | tout est de travers       | tout est aligné au pixel    |
+
+Et partout du serrano exposé comme un trophée de chasse : quarante et une
+vitrines, chacune avec sa meule sous une lumière rasante.
+
+**La garde**, comme demandé : des Serra en livrée, mêmes dessins, mêmes
+comportements, mais deux à six fois la vie et deux à trois fois les dégâts.
+Une subtilité d'équilibrage qui compte — les points de vie ne protègent que des
+**coups de poing** ; un saut sur la tête tue toujours en une fois. Le Garde
+ordinaire reste donc écrasable (il punit celui qui martèle, pas celui qui
+saute), le Garde-Lourd et le Hallebardier non.
+
+## Le premier combat
+
+`genre: 'kirby'` — le **quatrième** scénario de combat du jeu, à côté du
+blindage, de la duplication et des astéroïdes. C'est le plus direct des quatre,
+et c'est délibéré : à la onzième heure, une cinquième règle à apprendre
+retarderait le joueur au lieu de le récompenser. On frappe Kirby 67, il perd de
+la vie.
+
+Ce qu'il a à la place, c'est un rythme : il roule des meules (qu'un coup de
+poing brise), il aspire, il charge, il appelle sa garde. **Deux de ces gestes —
+l'aspiration et la charge — sont exactement ceux du combat final.** On les
+apprend ici, seuls et sans danger, pour ne pas les découvrir là-bas sous trois
+attaques simultanées. C'est la raison d'être de ce premier combat.
+
+Il ne meurt pas : sous 4 PV, le combat s'arrête de lui-même et la cinématique
+prend la main. Il fallait bien qu'il reste debout pour se relever.
+
+## L'acte final
+
+Quatre cinématiques, chacune avec son déclencheur :
+
+1. **l'arrivée au manoir** — une seule fois, au départ depuis la carte ;
+2. **l'explosion** — il se relève, fait sauter quarante et une vitrines et
+   deux cents mètres de tapis rouge, et passe dans le monde réel. Direction
+   Lille, Grand-Place. Le BRADDY3000 explique pourquoi ce n'est pas un hasard ;
+3. **le portail**, monté au fond de la base. Le BRADDY3000 demande « ES-TU
+   SÛR ? » et rappelle combien de Brad Coins il reste — la boutique est sur le
+   chemin du portail, ce n'est pas un hasard non plus ;
+4. **la fin**, quand Kirby 67 s'assoit sur le pavé mouillé.
+
+Le costume d'or ne se débloque plus « en terminant dix niveaux » (ce qui
+tombait au retour de la Lune) mais **en battant Kirby 67 pour de bon**.
+
+## Le combat final, à Lille
+
+Un fichier à part, `js/final.js`, avec sa propre simulation et son propre
+rendu. Le moteur du jeu est un plateformer en coupe ; ce combat se joue sur une
+**place** — on tourne autour de l'adversaire, on s'écarte d'une meule qui
+arrive de face. Ajouter un axe de profondeur au moteur aurait touché chaque
+collision, chaque ennemi et chaque niveau déjà validé. Là, rien de ce qui
+marche ailleurs ne peut casser, et réciproquement.
+
+**La perspective** tient en six lignes — une projection en trou d'épingle :
+
+```
+d  = z + DIST_CAM          distance du point à la caméra
+k  = FOCALE / d            échelle à cette distance
+sx = LARGEUR/2 + (x - cam) * k
+sy = HORIZON + (HAUTEUR_CAM - y) * k
+```
+
+Le sol est un damier dont les bandes se resserrent vers le fond, les
+personnages sont des sprites multipliés par `k`, et l'ordre de dessin est
+simplement l'ordre des `z` décroissants. Aucune bibliothèque, aucun WebGL, et
+la page reste ouvrable par double-clic.
+
+**Les règles.** Kirby 67 a trois points de vie, et une seule chose peut les lui
+retirer : une onde de Brad-Shy **chargée à bloc, tirée de près**. Les poings ne
+lui font rien — et le jeu le dit à chaque coup dans le vide, plutôt que de
+laisser croire à un bug.
+
+La jauge se remplit en abattant les Serra qu'il envoie. Ses vagues ne sont donc
+pas une nuisance ajoutée pour l'intensité : **ce sont les munitions**. Sans
+elles on ne peut pas gagner ; avec elles, rester en vie devient le problème.
+Les deux moitiés du combat se tiennent.
+
+À chaque point de vie perdu, une mécanique de plus, et il peut les enchaîner :
+
+| PV restants | ce qu'il a |
+|-------------|------------|
+| 3           | l'aspiration |
+| 2           | + la charge téléguidée |
+| 1           | + la pluie de meules |
+
+**Les commandes changent**, et c'est la seule fois du jeu : on ne saute pas sur
+une place, on s'écarte. Les flèches (ou ZQSD) déplacent dans les quatre
+directions, **Espace devient une esquive** — un bond court, invincible, suivi
+d'un temps de recharge. X frappe les Serra, C tire l'onde. Un bandeau le
+rappelle au début du combat.
+
+## Quatre bugs trouvés par les tests
+
+**`undefined <= 0` vaut faux.** Encore. `reposCharge` valait `undefined` tant
+que le pilotage n'avait pas tourné une fois, et la condition « la charge est
+rechargée » était donc fausse au premier tour : Kirby 67 ne chargeait **jamais**
+au manoir. C'est exactement le piège qui empêchait la pluie d'astéroïdes de
+démarrer au prototype 15. Toutes ces conditions s'écrivent maintenant `!(x > 0)`.
+
+**Le boss agissait pendant sa propre charge.** La phase retombait à « attente »
+dès l'image suivante, parce qu'elle ne testait que la course et pas l'élan qui
+la précède. Il roulait une meule au milieu de sa course, ou relançait une
+seconde charge par-dessus la première.
+
+**L'aspiration ne se déclenchait presque jamais.** Elle demandait 190 px
+d'écart, alors que Kirby 67 vise une distance de confort de 150 et s'y tient à
+quarante pixels près. Un joueur qui restait au contact ne voyait donc jamais le
+geste que le manoir est justement chargé de lui apprendre.
+
+**Trois quarts de l'écran ne montraient rien** dans la première version de
+l'arène finale : les façades étaient posées sur la ligne d'horizon, et entre
+elles et le terrain jouable s'étalaient cent trente pixels de sol vide. Elles
+sont maintenant posées sur le **fond de la place**. Ce qui remplissait de vide
+est devenu la Grand-Place.
+
+## Vérification
+
+**206 vérifications, 0 échec.** Cinquante-deux sont nouvelles :
+
+- la garde du manoir existe, est plus dure, et reste écrasable là où il faut ;
+- Kirby 67 est lu comme une planche d'animation, pas comme un sprite ;
+- le combat du manoir s'arrête **avant** sa mort, appelle ses trois vagues, et
+  joue bien ses quatre gestes ;
+- l'aspiration déplace Brad **sans le blesser** ;
+- le portail n'existe qu'entre les deux combats et demande confirmation ;
+- **cinquante coups de poing ne font rien à Kirby 67** ; l'onde à jauge vide
+  est refusée ; l'onde tirée de trop loin le rate mais consomme la jauge ;
+  l'onde pleine et proche lui retire un point de vie et le sonne ;
+- les trois paliers ne donnent jamais une mécanique avant son heure ;
+- frapper dans le vide ne charge rien, abattre un Serra charge ;
+- **le combat se gagne** (32 s de simulation, 4 PV sur 24 restants) et **ne se
+  gagne pas en restant immobile** ;
+- les quatre cinématiques existent, ne se rejouent pas, et le costume d'or ne
+  s'obtient qu'à la vraie fin.
+
+Le manoir est traversé par le robot jusqu'à la salle du trône en 21,6 s. Il
+n'est pas dans la liste des « traversées complètes », et ce n'est pas un
+oubli : sa porte ne se franchit jamais, la cinématique la remplace.
+
+Le vérificateur de géométrie passe sur les douze niveaux.
+
+## Les musiques
+
+Cinq manquent maintenant, toutes déclarées et attendues sous ces noms :
+
+| fichier attendu | à quel moment |
+|-----------------|---------------|
+| `assets/audio/niveau8.m4a`  | le complexe scientifique |
+| `assets/audio/niveau9.m4a`  | la lune |
+| `assets/audio/niveau10.m4a` | le manoir de Kirby 67 |
+| `assets/audio/mini-kirby.m4a` | le premier combat, salle du trône |
+| `assets/audio/mega-kirby.m4a` | le combat final, à Lille |
+
+Le menu principal les signale (« 5 pistes audio introuvables ») au lieu de se
+taire. Dépose-les sous ces noms, ou envoie-les-moi et je te renvoie le lot
+converti en `.m4a` + `.mp3`.
+
+## Ce qui reste
+
+Rien, pour ce jeu. Il a un début, dix niveaux, quatre mini-boss, un boss final
+et une fin. Le reste, c'est le kart.

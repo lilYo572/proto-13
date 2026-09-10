@@ -1128,6 +1128,7 @@ function activerZone(z) {
     case 'rejouer':     preparerNiveau(); break;
     case 'menu-retour': retourAuMenu(); break;
     case 'relancer-mort': relancerApresMort(); break;
+    case 'rejouer-final': demarrerCombatFinal(false); break;
     case 'mort-hub':    audio.arreterMusique(0.5); entrerHub(false); break;
     case 'aller-hub':   rentrerALaBase(); break;
     case 'difficulte':    indexDifficulte = z.valeur; audio.bruit('menu'); break;

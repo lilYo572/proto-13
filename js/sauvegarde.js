@@ -98,8 +98,11 @@ const UNIFORMES = [
     detail: 'Débloqué en passant une fois au camp d\'entraînement.' },
   { cle: 'classique-bordeaux', nom: 'Cravate bordeaux', condition: 'ameliorations>=25',
     detail: 'Débloqué en achetant TOUTES les améliorations, jusqu\'au dernier palier.' },
-  { cle: 'dore', nom: 'Le costume d\'or', condition: 'niveaux>=10',
-    detail: 'Débloqué en terminant le jeu. Bon courage.' },
+  /* Le costume d'or se meritait « en terminant dix niveaux », ce qui tombait
+     au retour de la Lune — donc AVANT le manoir et avant le combat final. Il
+     recompense maintenant la vraie fin du jeu. */
+  { cle: 'dore', nom: 'Le costume d\'or', condition: 'final>=1',
+    detail: 'Débloqué en battant Kirby 67 pour de bon. Bon courage.' },
 ];
 
 /* -----------------------------------------------------------------------------
@@ -172,6 +175,9 @@ const partie = {
   entrainements: 0,             // passages au camp — ne rapporte rien d'autre
   hubVu: false,                 // le dialogue de decouverte de la base a deja eu lieu
   fusee: false,                 // la cinematique du depart pour la lune a deja eu lieu
+  manoirVu: false,              // la cinematique d'arrivee au manoir a deja eu lieu
+  manoirFait: false,            // Kirby 67 est tombe au manoir : le portail existe
+  finalGagne: false,            // le combat final est gagne — le jeu est fini
   piste: 'menu',                // morceau choisi au jukebox
   codes: [],                    // codes du jukebox deja entres
   objets: [],                   // pieces de l'appareil a raclette recuperees
@@ -273,7 +279,8 @@ function chargerPartie() {
     }
     if (typeof brut.arcadeJour === 'string') partie.arcadeJour = brut.arcadeJour;
     if (typeof brut.hubVu === 'boolean') partie.hubVu = brut.hubVu;
-    if (typeof brut.fusee === 'boolean') partie.fusee = brut.fusee;
+    ['fusee', 'manoirVu', 'manoirFait', 'finalGagne']
+      .forEach(k => { if (typeof brut[k] === 'boolean') partie[k] = brut[k]; });
     if (typeof brut.piste === 'string' && PISTES_JUKEBOX.some(p => p.cle === brut.piste)) {
       partie.piste = brut.piste;
     }
@@ -317,6 +324,9 @@ function effacerPartie() {
   partie.entrainements = 0;
   partie.hubVu = false;
   partie.fusee = false;
+  partie.manoirVu = false;
+  partie.manoirFait = false;
+  partie.finalGagne = false;
   partie.objets = [];
   partie.bossVaincus = [];
   partie.piste = 'menu';
@@ -376,6 +386,7 @@ function uniformeDebloque(u) {
     case 'arcade': return partie.meilleurArcade >= seuil;
     case 'entrainement': return partie.entrainements >= seuil;
     case 'ameliorations': return paliersAchetes() >= seuil;
+    case 'final': return (partie.finalGagne ? 1 : 0) >= seuil;
   }
   return false;
 }

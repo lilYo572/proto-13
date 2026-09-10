@@ -338,6 +338,10 @@ const CONSEILS = {
   'Serra-Spectre': "Vert, et rapide. Il ne se pose jamais : attrape-le en l'air.",
   'Serra-Seraphin': "Il encaisse presque tout. Attends qu'il se divise, et ne le quitte pas des yeux.",
   'Serra-Balistique': "Ta force ne lui fera rien. Attire-le sous un impact.",
+  'Serra-Garde': "Un Serra en livrée. Même bestiole, trois fois plus de patience.",
+  'Serra-Garde-Lourd': "Il ne s'écrase pas et il ne recule pas. Prends-le de côté.",
+  'Serra-Hallebardier': "Invulnérable de face. Sa boule, en revanche, ne lui appartient plus.",
+  'Kirby67': "Il t'a déjà vu venir trois fois. Il attend la quatrième.",
   'astéroïde': "Le cercle au sol dit où ça tombe. Ce n'était pas une décoration.",
   'le vide': "Le vide, Brad. Le vide.",
 };
@@ -571,6 +575,56 @@ const TYPES_ENNEMI = {
                         coqueRGB: '150,196,255',
                         messageResistance: 'sa coque tient — regarde le ciel',
                         cadence: 2.9, pilotage: 'balistique' },
+
+  /* -------------------------------------------------------------------------
+     LA GARDE DU MANOIR — NIVEAU 10
+
+     Ce sont des Serra en LIVREE : meme dessin, meme comportement, mais plus de
+     vie et plus de degats. C'est ce qui a ete demande, et c'est aussi le bon
+     usage d'un dernier niveau — on ne veut pas y apprendre un ennemi de plus,
+     on veut que ceux qu'on connait fassent enfin peur.
+
+     Une precision qui compte pour l'equilibrage : `pv` ne protege que des
+     COUPS DE POING. Un saut sur la tete tue toujours en une fois (voir
+     contactEnnemi, qui applique 999 aux ecrasables). Le Garde ordinaire reste
+     donc ecrasable — il punit celui qui martele, pas celui qui saute juste —
+     tandis que le Garde-Lourd et le Hallebardier, eux, ne s'ecrasent pas du
+     tout.
+  ------------------------------------------------------------------------- */
+  'Serra-Garde':   { w: 22, h: 34, pv: 3, vitesse: 1.35, degats: 2, shy: 1.8,
+                     ecrasable: true, sensNatif: -1, sprite: 'Serra', echelle: 1.08,
+                     teinte: 'rgba(190,150,70,.5)' },
+
+  'Serra-Garde-Lourd': { w: 34, h: 42, pv: 6, vitesse: 0.5, degats: 3, shy: 3.2,
+                     ecrasable: false, sensNatif: 1, sprite: 'Serra-Lourd',
+                     echelle: 1.12, plateforme: true,
+                     teinte: 'rgba(190,150,70,.5)' },
+
+  /* Le Hallebardier tient la porte : invulnerable de face comme tout Lanceur,
+     il se renvoie sa propre boule. Sa cadence est plus serree que celle d'un
+     Lanceur de couloir — on est chez Kirby 67, plus dans une arriere-cour. */
+  'Serra-Hallebardier': { w: 26, h: 36, pv: 1, vitesse: 0, degats: 2, shy: 2.4,
+                     ecrasable: false, sensNatif: 1, sprite: 'Serra-Lanceur',
+                     echelle: 1.1, invulnerable: true, lance: true, cadence: 1.5,
+                     teinte: 'rgba(190,150,70,.5)' },
+
+  /* -------------------------------------------------------------------------
+     KIRBY 67
+
+     Le seul ennemi du jeu qui ne soit pas un Serra. C'est un etre humain, et il
+     est dessine comme tel : sa planche a exactement le decoupage de celle de
+     Brad (quatre colonnes, trois lignes, cellules de 36x48), d'ou le drapeau
+     `planche` que le rendu consulte. Il marche, court et respire avec les
+     memes images ; seuls les vetements changent.
+
+     Il n'a PAS de resistance. Le premier combat, au manoir, doit se gagner
+     franchement : c'est le vrai combat final qui a des regles particulieres, et
+     il se joue ailleurs (js/final.js).
+  ------------------------------------------------------------------------- */
+  'Kirby67':       { w: 24, h: 46, pv: 30, vitesse: 2.0, degats: 3, shy: 8,
+                     ecrasable: false, sensNatif: 1, sprite: 'kirby',
+                     planche: true, boss: true, echelle: 1.08,
+                     degatsAuContact: false, pilotage: 'kirby' },
 };
 
 /* Impulsion d'un ennemi qui franchit un trou, et distance maximale qu'il
@@ -699,6 +753,17 @@ function blesserEnnemi(e, degats, sensPoussee, ignoreInvulnerabilite, ignoreResi
     e.flash = 0.12;
     audio.bruit('blinde');
     texteFlottant(e.x + e.w / 2, e.y, 'blindé — vide la salle !', '#78beff');
+    return;
+  }
+
+  /* Une invulnerabilite COURTE, posee par une mise en scene plutot que par le
+     type : Kirby 67 claque des doigts pour appeler sa garde, et on ne le
+     frappe pas pendant ce geste-la. Une seconde et demie, annoncee, et il
+     redevient frappable — ce n'est pas une phase defensive a nettoyer. */
+  if (e.invincibleCourt > 0) {
+    e.flash = 0.1;
+    audio.bruit('blinde');
+    texteFlottant(e.x + e.w / 2, e.y, 'pas maintenant', '#e8c98a');
     return;
   }
 
@@ -1172,7 +1237,11 @@ function contactEnnemi(e, dt) {
      revenait a vider la barre de vie sans qu'aucune decision du joueur n'entre
      en jeu — il suffisait qu'il soit la. Son piqué, lui, est annonce, vise, et
      esquivable : c'est la seule chose qui doit coûter. */
-  if (e.t.degatsAuContact === false && !(e.piqueT > 0)) return;
+  /* Certains ennemis ne blessent qu'en ATTAQUANT. Le Seraphin pique, Kirby 67
+     charge : hors de ces fenetres-la, les toucher ne coute rien. Sans cette
+     regle, un boss qui suit le joueur viderait sa barre de vie sans qu'aucune
+     decision n'entre en jeu — il suffirait qu'il soit la. */
+  if (e.t.degatsAuContact === false && !(e.piqueT > 0) && !(e.chargeT > 0)) return;
   if (brad.invincible <= 0) {
     blesserBrad(e.t.degats, e.x + e.w / 2, e.type);
     e.vx = -Math.sign(brad.x - e.x) * 90;

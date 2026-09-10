@@ -184,6 +184,11 @@ const CONSEILS_CHARGEMENT = [
   'Le cercle orange au sol marque un impact. Il se pose là où tu te trouves.',
   'Le Serra-Balistique ne craint pas tes poings. Il craint ce qui tombe du ciel.',
   'Un astéroïde ne frappe que près du sol : sauter au bon moment est une esquive.',
+  'La garde du manoir a plus de vie et frappe plus fort. Mais elle s\'écrase toujours pareil.',
+  'Une meule de serrano se brise d\'un coup de poing. Ne la laisse pas te rouler dessus.',
+  'Dans le combat final, on ne saute pas : Espace devient une esquive invincible.',
+  'Kirby 67 ne craint que l\'onde de choc, chargée à bloc et tirée de près.',
+  'Ses Serra ne sont pas là pour gêner. Ce sont eux qui remplissent ta jauge.',
 ];
 
 const chargement = {

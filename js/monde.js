@@ -26,7 +26,7 @@ ctx.imageSmoothingEnabled = false;
 const NIVEAUX = {};
 const ORDRE_NIVEAUX = ['intro', 'niveau1', 'niveau2', 'niveau3',
                        'niveau4', 'niveau5', 'niveau6', 'niveau7',
-                       'niveau8', 'niveau9'];
+                       'niveau8', 'niveau9', 'niveau10'];
 
 let niveauCourant = 'intro';
 let ZONES = [];
@@ -209,6 +209,13 @@ function precharger(surProgres) {
   }));
 
   IMAGES_ENNEMIS.forEach(n => image('assets/ennemis/' + n + '.png', sprites, n));
+  /* La planche de KIRBY 67. Ce n'est pas un sprite d'ennemi mais une planche
+     d'animation au format de celle de Brad — quatre colonnes, trois lignes,
+     cellules de 36x48 — parce qu'il est un personnage et non un Serra. Elle est
+     rangee dans `sprites` comme les autres pour que le rendu des ennemis y
+     accede sans cas particulier ; c'est le drapeau `planche` du TYPE qui dit
+     comment la lire. */
+  image('assets/kirby/kirby.png', sprites, 'kirby');
   image('assets/ui/logo-imagine.png', logos, 'imagine');
   image('assets/ui/logo-hwr.png', logos, 'hwr');
   Object.keys(PLANCHES_UNIFORMES).forEach(cle =>

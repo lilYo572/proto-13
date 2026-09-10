@@ -24,7 +24,20 @@ const POSTES = [
   { cle: 'arcade',       x: 1120, nom: 'Arcade',      sous: 'Serra Invaders' },
   { cle: 'jukebox',      x: 1290, nom: 'Jukebox',     sous: 'Musique de la base' },
   { cle: 'carte',        x: 1560, nom: 'Carte',       sous: 'Départ en mission' },
+  /* LE PORTAIL. Il n'existe qu'entre le manoir et la fin du jeu : avant, il
+     n'y a rien de l'autre cote ; apres, il n'y a plus personne. Il est pose au
+     BOUT de la base, plus loin que la carte — on passe donc devant la boutique
+     avant de l'atteindre, ce qui est exactement l'effet voulu. */
+  { cle: 'portail', x: 1748, nom: 'Portail', sous: 'Le monde réel',
+    condition: () => partie.manoirFait && !partie.finalGagne },
 ];
+
+/* Les postes reellement presents. Un poste conditionnel ne doit etre ni
+   dessine, ni activable, ni compte dans la portee : filtrer a un seul endroit
+   evite qu'une des trois listes oublie la condition. */
+function postesActifs() {
+  return POSTES.filter(p => !p.condition || p.condition());
+}
 
 const PORTEE_POSTE = 46;         // distance a laquelle un poste s'active
 const PORTEE_BRADDY = 60;        // distance a laquelle on peut lui parler
@@ -143,6 +156,10 @@ function majHub(dt) {
 
   const b = hub.brad;
   if (!b) return;
+  /* Une question posee fige la base. Sans cette ligne, Brad continuait de
+     marcher derriere la confirmation du portail — et ressortait de la zone du
+     poste, ou pire, la re-declenchait en boucle. */
+  if (confirmation) { b.vx = 0; return; }
 
   const dir = (entrees.droite ? 1 : 0) - (entrees.gauche ? 1 : 0);
   const cible = dir * R.vitesseMarche * (entrees.courir ? 1.5 : 1);
@@ -173,7 +190,7 @@ function majHub(dt) {
   // Poste a portee
   const centre = b.x + b.w / 2;
   const avant = hub.poste;
-  hub.poste = POSTES.find(p => Math.abs(p.x - centre) < PORTEE_POSTE) || null;
+  hub.poste = postesActifs().find(p => Math.abs(p.x - centre) < PORTEE_POSTE) || null;
   if (hub.poste && hub.poste !== avant) audio.bruit('menu');
 
   // Le BRADDY3000 est un interlocuteur, pas un poste : on lui parle sans
@@ -197,6 +214,7 @@ function ouvrirPoste(cle) {
   indexVestiaire = 0; indexCarte = 0;
   if (cle === 'arcade') { ouvrirArcade(); return; }
   if (cle === 'jukebox') { ouvrirJukebox(); return; }
+  if (cle === 'portail') { ouvrirPortailFinal(); return; }
   if (cle === 'entrainement') {
     // Le camp est un vrai niveau, charge par le moteur habituel. Le drapeau
     // `entrainement` du fichier coupe toutes les recompenses.
@@ -265,7 +283,7 @@ function dessinerHub() {
   }
 
   dessinerVitrine(c);
-  POSTES.forEach(p => dessinerPoste(p, c));
+  postesActifs().forEach(p => dessinerPoste(p, c));
 
   // Sol
   ctx.fillStyle = '#2b3040'; ctx.fillRect(0, HUB_SOL, LARGEUR, HAUTEUR - HUB_SOL);
@@ -289,6 +307,12 @@ function dessinerHub() {
   }
 
   hudHub(c);
+
+  /* La confirmation se dessine AUSSI dans la base, pas seulement dans les
+     panneaux. Le portail est le premier poste a en demander une sans ouvrir
+     d'ecran : sans cette ligne, le jeu attendait une reponse a une question
+     que personne ne voyait. */
+  if (confirmation && scene === 'hub') dessinerConfirmation();
 }
 
 /* -----------------------------------------------------------------------------
@@ -461,6 +485,53 @@ function dessinerPoste(p, c) {
     // bandes au sol
     ctx.fillStyle = 'rgba(232,182,44,.45)';
     for (let i = 0; i < 7; i++) ctx.fillRect(-40 + i * 12, -5, 6, 4);
+
+  } else if (p.cle === 'portail') {
+    /* LE PORTAIL VERS LE MONDE REEL. Il ne ressemble a aucun autre poste, et
+       il n'est pas cense y ressembler : c'est une machine montee a la hate,
+       deux montants, des cables, et entre les deux une dechirure violette.
+       On doit comprendre en le voyant que ce n'est pas un comptoir. */
+    ctx.fillStyle = '#2b2438'; ctx.fillRect(-56, -136, 14, 136);
+    ctx.fillStyle = '#2b2438'; ctx.fillRect(42, -136, 14, 136);
+    ctx.fillStyle = '#3d3352'; ctx.fillRect(-56, -142, 112, 8);
+    // Les cables qui pendent, parce que le BRADDY3000 a fait vite.
+    ctx.strokeStyle = 'rgba(120,90,160,.7)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const bx = -46 + i * 30;
+      ctx.beginPath();
+      ctx.moveTo(bx, -134);
+      ctx.quadraticCurveTo(bx + 8, -116 + Math.sin(hub.t + i) * 3, bx + 2, -100);
+      ctx.stroke();
+    }
+    // La dechirure : un ovale de lumiere qui respire.
+    const souffle = 1 + 0.06 * Math.sin(hub.t * 2);
+    const g = ctx.createRadialGradient(0, -68, 6, 0, -68, 74 * souffle);
+    g.addColorStop(0, actif ? 'rgba(226,214,255,.95)' : 'rgba(200,180,255,.7)');
+    g.addColorStop(0.55, 'rgba(150,80,240,.5)');
+    g.addColorStop(1, 'rgba(90,40,160,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, -68, 40 * souffle, 66 * souffle, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Ce qu'on apercoit dedans : un bout de ciel gris et un pignon de brique.
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, -68, 26, 46, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = '#7c7568'; ctx.fillRect(-30, -116, 60, 100);
+    ctx.fillStyle = '#5d4a44'; ctx.fillRect(-14, -84, 28, 60);
+    ctx.beginPath();
+    ctx.moveTo(-18, -84); ctx.lineTo(0, -104); ctx.lineTo(18, -84);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // Les eclats qui tournent autour
+    ctx.fillStyle = 'rgba(200,170,255,.7)';
+    for (let i = 0; i < 8; i++) {
+      const a = i * 0.79 + hub.t * 1.2;
+      ctx.fillRect(Math.round(Math.cos(a) * 52), Math.round(-68 + Math.sin(a) * 74), 3, 3);
+    }
+    ctx.fillStyle = '#8f5ad8'; ctx.fillRect(-56, -148, 112, 6);
   }
 
   // Enseigne
@@ -615,7 +686,7 @@ function hudHub(c) {
   const my = HAUTEUR - 14;
   ctx.fillStyle = 'rgba(255,255,255,.1)';
   ctx.fillRect(60, my, LARGEUR - 120, 2);
-  POSTES.forEach(p => {
+  postesActifs().forEach(p => {
     const px = 60 + (p.x / HUB_L) * (LARGEUR - 120);
     ctx.fillStyle = hub.poste === p ? ACCENT : 'rgba(255,255,255,.35)';
     ctx.fillRect(px - 2, my - 3, 4, 8);
@@ -1125,13 +1196,17 @@ function dessinerCarte() {
   if (reste > 0) ctx.fillText('▼ ' + reste + ' en dessous', LARGEUR / 2, bas + 4);
   ctx.textAlign = 'left';
 
-  /* La route qui reste. Cette liste disait autrefois « discothèque Brésil ·
-     maison hantée », ce qui plaçait la maison hantée au niveau 5 — alors que
-     la garniture y est inscrite au niveau 6 dans sauvegarde.js et dans la
-     vitrine de la base. Les deux ne pouvaient pas etre vraies ; celle-ci suit
-     les donnees. */
+  /* La derniere ligne dit ce qui reste, et elle change trois fois : avant le
+     manoir, entre le manoir et le portail, et une fois le jeu fini. Une carte
+     qui annoncerait encore « le combat final » a un joueur qui l'a deja gagne
+     serait la seule chose du jeu a ne pas savoir ou il en est. */
   ctx.fillStyle = 'rgba(255,255,255,.25)';
-  ctx.fillText('À venir : le manoir de Kirby 67 et le combat final (10)', 68, bas + 20);
+  const route = partie.finalGagne
+    ? 'Terminé. Tous les niveaux restent rejouables — le manoir aussi.'
+    : (partie.manoirFait
+        ? 'Le portail est ouvert, tout au fond de la base. Le reste ne se joue plus ici.'
+        : 'Au bout : le manoir de Kirby 67 (10), puis le monde réel.');
+  ctx.fillText(route, 68, bas + 20);
 
   ctx.fillStyle = 'rgba(255,255,255,.3)';
   ctx.fillText('↑ ↓ choisir  ·  Entrée partir en mission  ·  Échap sortir', 56, HAUTEUR - 33);
@@ -1158,6 +1233,9 @@ function lancerNiveauCourant() {
     lancerDialogue(DIALOGUE_FUSEE, () => preparerNiveau('niveau9'));
     return;
   }
+
+  // Meme regle pour l'arrivee au manoir de Kirby 67 : une fois, et une seule.
+  if (id === 'niveau10' && !partie.manoirVu) { lancerDepartManoir(); return; }
 
   preparerNiveau(id);
 }

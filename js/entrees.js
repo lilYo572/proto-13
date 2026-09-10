@@ -155,6 +155,14 @@ addEventListener('keydown', e => {
       return;
 
     case 'hub': {
+      // Une confirmation ouverte prend la main sur tout le reste : sinon les
+      // touches de deplacement continueraient de faire marcher Brad derriere
+      // la question posee.
+      if (confirmation) {
+        if (valider) repondreConfirmation(true);
+        else if (annuler) repondreConfirmation(false);
+        return;
+      }
       // Le hub se joue : on laisse passer les commandes de deplacement, et le
       // saut sert d'action devant un poste (majHub le consomme).
       if (annuler) { retourAuMenu(); relacherTout(); return; }
@@ -226,6 +234,30 @@ addEventListener('keydown', e => {
       return;
     }
 
+    /* LE COMBAT FINAL A SES PROPRES COMMANDES.
+
+       On n'y saute pas : on se deplace sur une place, en quatre directions.
+       Les touches de saut deviennent donc « avancer », et Espace devient
+       l'esquive. Le mappage vit ici, dans son propre tableau, plutot que dans
+       MAP_CODE : le reste du jeu ne doit pas voir passer une direction qu'il
+       ne sait pas interpreter. */
+    case 'final': {
+      if (annuler) {
+        if (finale.mort || finale.fini) { audio.arreterMusique(0.5); entrerHub(false); return; }
+        ouvrirPause();
+        return;
+      }
+      if (finale.mort) {
+        if (valider) demarrerCombatFinal(false);
+        return;
+      }
+      const af = actionFinale(e);
+      if (!af) return;
+      if (!entreesFinal[af]) marquerFrontFinal(af);
+      entreesFinal[af] = true;
+      return;
+    }
+
     case 'pret':
       if (valider) commencerNiveau();
       else if (annuler) retourAuMenu();
@@ -260,11 +292,16 @@ addEventListener('keydown', e => {
 });
 
 addEventListener('keyup', e => {
+  if (scene === 'final') {
+    const af = actionFinale(e);
+    if (af) entreesFinal[af] = false;
+    return;
+  }
   const a = actionDe(e);
   if (a) entrees[a] = false;
 });
 
-addEventListener('blur', relacherTout);
+addEventListener('blur', () => { relacherTout(); relacherFinal(); });
 
 /* --- Souris ---------------------------------------------------------------
    Le menu etant dessine dans le canvas, il faut convertir les coordonnees de
@@ -315,13 +352,30 @@ const estTactile = matchMedia('(pointer: coarse)').matches;
 
 zoneTactile.querySelectorAll('.tbtn').forEach(btn => {
   const a = btn.dataset.touche;
+  /* Le combat final n'a pas les memes actions : le bouton de saut y devient
+     l'esquive. Les quatre boutons tactiles suffisent a le jouer — le
+     deplacement en profondeur reste au clavier, mais tout ce qui fait mal
+     s'esquive lateralement ou d'un bond. */
+  const versFinal = { gauche: 'gauche', droite: 'droite', saut: 'esquive',
+                      attaque: 'attaque', onde: 'onde' };
   const presser = ev => {
     ev.preventDefault();
+    if (scene === 'final') {
+      const af = versFinal[a];
+      if (!af) return;
+      if (!entreesFinal[af]) marquerFrontFinal(af);
+      entreesFinal[af] = true;
+      return;
+    }
     if (scene !== 'jeu' && scene !== 'hub' && scene !== 'arcade') return;
     if (FRONTS[a] && !entrees[a]) marquerFront(a);
     entrees[a] = true;
   };
-  const relacher = ev => { ev.preventDefault(); entrees[a] = false; };
+  const relacher = ev => {
+    ev.preventDefault();
+    entrees[a] = false;
+    if (versFinal[a]) entreesFinal[versFinal[a]] = false;
+  };
   btn.addEventListener('pointerdown', presser);
   btn.addEventListener('pointerup', relacher);
   btn.addEventListener('pointercancel', relacher);
@@ -331,7 +385,7 @@ zoneTactile.querySelectorAll('.tbtn').forEach(btn => {
 /* Les boutons tactiles ne servent que pendant le jeu : ailleurs ils
    masqueraient inutilement le menu. */
 function majAffichageTactile() {
-  const jouable = scene === 'jeu' || scene === 'hub' ||
+  const jouable = scene === 'jeu' || scene === 'hub' || scene === 'final' ||
                   (scene === 'arcade' && arcade.etat === 'jeu');
   const visible = estTactile && jouable && !enPortrait();
   if (zoneTactile.hidden === visible) zoneTactile.hidden = !visible;

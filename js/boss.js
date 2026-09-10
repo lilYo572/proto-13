@@ -94,6 +94,56 @@ const ASTEROIDE = {
 const INTERVALLES_PLUIE = [3.4, 2.8, 2.2];
 const DUREE_SONNE = 2.8;             // fenetre de degats apres un impact
 
+/* -----------------------------------------------------------------------------
+   LE QUATRIEME GENRE DE COMBAT : KIRBY 67 AU MANOIR (niveau 10)
+
+   C'est le combat le plus DIRECT des quatre, et c'est deliberé. Les trois
+   autres reposent chacun sur une regle qu'il faut comprendre avant de pouvoir
+   gagner : vider la salle, suivre le bon volant, attirer le boss sous un
+   rocher. Celui-ci n'en a aucune. On frappe Kirby 67, il perd de la vie.
+
+   Deux raisons.
+
+   1. C'EST LE DERNIER NIVEAU. Une cinquieme regle a apprendre a la onzieme
+      heure ne recompense pas le joueur, elle le retarde.
+   2. CE N'EST PAS LE VRAI COMBAT. Celui-la se joue ailleurs, et il a ses
+      propres regles (js/final.js). Le combat du manoir est la pour donner un
+      visage a l'adversaire, pas pour etre l'epreuve finale.
+
+   Ce que Kirby 67 a, a la place d'une regle, c'est un RYTHME : il roule des
+   meules, il aspire, il charge, il appelle sa garde. Et deux de ces quatre
+   gestes — l'aspiration et la charge — sont exactement ceux qu'il reutilisera
+   dans le combat final. On les apprend ici, sans enjeu, pour ne pas les
+   decouvrir la-bas sous trois attaques simultanees.
+
+   Il ne meurt pas non plus. Passe un certain seuil de vie, le combat s'arrete
+   de lui-meme et la cinematique prend la main.
+-------------------------------------------------------------------------- */
+
+const KIRBY = {
+  // La vie sous laquelle le combat cede la place a la cinematique. Ce n'est
+  // pas zero : Kirby 67 doit rester debout pour se relever.
+  finCombat: 4,
+  seuilsGarde: [0.72, 0.45, 0.22],
+  reposMin: 1.5,
+  reposMax: 2.4,
+  // L'aspiration. Elle tire Brad, elle ne le blesse pas : c'est un
+  // deplacement force, et le contrer se fait en courant a contresens.
+  dureeAspiration: 1.5,
+  forceAspiration: 230,
+  // La charge. Meme grammaire que le piqué du Seraphin : cible verrouillee au
+  // debut de l'elan, trait au sol, presque une seconde pour s'ecarter.
+  preparationCharge: 0.85,
+  vitesseCharge: 470,
+  degatsCharge: 3,
+  reposCharge: 4.0,
+  // Les meules de serrano, qui roulent au sol. Elles se sautent, et un coup de
+  // poing les fait exploser — ce qui donne au joueur autre chose a faire que
+  // d'attendre qu'elles passent.
+  vitesseMeule: 200,
+  degatsMeule: 2,
+};
+
 const SEUILS_DUPLICATION = [0.9, 0.6, 0.3];
 const COPIES_PAR_CYCLE = [5, 7, 9];
 const DUREE_REVELATION = 1.5;                    // le vrai est designe
@@ -134,6 +184,11 @@ const arene = {
   asteroides: [],       // {x, t, y, r, rot}
   prochaineChute: 0,
   sonneVu: false,       // le boss etait assomme a l'image precedente
+
+  // --- propres au combat du manoir ---
+  meules: [],           // {x, y, vx, r, rot}
+  repos: 0,             // avant le prochain geste de Kirby 67
+  gardes: 0,            // vagues de garde deja appelees
 };
 
 function reinitialiserArene() {
@@ -172,6 +227,10 @@ function reinitialiserArene() {
   arene.asteroides = [];
   arene.prochaineChute = 2.2;      // un temps de repit a l'entree dans la salle
   arene.sonneVu = false;
+
+  arene.meules = [];
+  arene.repos = 2.0;
+  arene.gardes = 0;
 }
 
 /* La sortie du niveau reste verrouillee tant qu'un boss vit encore : un niveau
@@ -282,6 +341,10 @@ function majArene(dt) {
   }
   if (ARENE.genre === 'asteroides') {
     majAreneAsteroides(dt, b);
+    return;
+  }
+  if (ARENE.genre === 'kirby') {
+    majAreneKirby(dt, b);
     return;
   }
 
@@ -583,6 +646,311 @@ function majBalistique(b, dt) {
   });
 }
 
+/* -----------------------------------------------------------------------------
+   LE COMBAT DU MANOIR
+-------------------------------------------------------------------------- */
+
+function majAreneKirby(dt, b) {
+  contenirDansArene(b);
+  degagerDuBoss(b);
+  majMeules(dt);
+
+  /* LE COMBAT S'ARRETE AVANT LA MORT. C'est ce qui permet la suite de
+     l'histoire : Kirby 67 doit rester debout pour se relever, faire sauter son
+     manoir et partir. Passer par tuerEnnemi() puis « ressusciter » le
+     personnage pour la cinematique donnerait une seconde de flottement pendant
+     laquelle il serait affiche mort. */
+  if (b.pv <= KIRBY.finCombat) { terminerCombatManoir(b); return; }
+
+  // La garde arrive a heure fixe, sur les seuils de vie.
+  if (arene.gardes < KIRBY.seuilsGarde.length &&
+      b.pv <= b.pvMax * KIRBY.seuilsGarde[arene.gardes]) {
+    appelerLaGarde(b);
+  }
+
+  arene.tPhase = Math.max(0, arene.tPhase - dt);
+
+  switch (arene.phase) {
+    case 'appel':
+      // Il claque des doigts. Une seconde et demie ou l'on ne peut rien lui
+      // faire — assez pour que le geste se lise, trop court pour ennuyer.
+      if (arene.tPhase <= 0) { arene.phase = 'attente'; arene.repos = 0.6; }
+      break;
+
+    case 'aspire':
+      // Il inspire. Brad est TIRE vers lui, il n'est pas blesse : la punition,
+      // c'est de se retrouver au contact avec une charge qui arrive.
+      if (arene.tPhase > 0) {
+        const vers = Math.sign((b.x + b.w / 2) - (brad.x + brad.w / 2)) || 1;
+        brad.x += vers * KIRBY.forceAspiration * dt;
+        if (Math.random() < 0.4) {
+          particules(brad.x + brad.w / 2, brad.y + 10, 1, '#ffe9a8');
+        }
+      } else {
+        arene.phase = 'attente';
+        arene.repos = 0.5;
+      }
+      break;
+
+    case 'charge':
+      /* On attend l'ELAN **ET** la course. La version precedente ne testait que
+         `chargeT`, qui vaut encore zero pendant les huit dixiemes de seconde
+         d'elan : la phase retombait donc a « attente » des l'image suivante, et
+         le boss se remettait a choisir un geste PENDANT qu'il chargeait. Il
+         roulait une meule au milieu de sa propre course, ou relancait une
+         seconde charge par-dessus la premiere. */
+      if (b.prepareT > 0 || b.chargeT > 0) break;   // majKirby la joue
+      arene.phase = 'attente';
+      arene.repos = 1.0;
+      break;
+
+    default:
+      arene.repos -= dt;
+      if (arene.repos <= 0) choisirGesteKirby(b);
+      break;
+  }
+}
+
+/* Le choix du prochain geste. Il depend de la DISTANCE, pas du hasard seul :
+   un boss qui aspire un joueur deja colle a lui, ou qui charge a bout portant,
+   donne l'impression de tirer au sort. */
+function choisirGesteKirby(b) {
+  const ecart = Math.abs((b.x + b.w / 2) - (brad.x + brad.w / 2));
+  const tirage = Math.random();
+
+  /* Le seuil etait a 190 px. Or Kirby 67 vise une distance de confort de 150
+     et s'y tient a une quarantaine de pixels pres : la condition n'etait
+     presque jamais vraie, et un joueur qui restait au contact ne voyait jamais
+     l'aspiration — c'est-a-dire jamais le geste que le manoir est justement
+     charge de lui apprendre avant le combat final. */
+  if (ecart > 140 && tirage < 0.45) {
+    arene.phase = 'aspire';
+    arene.tPhase = KIRBY.dureeAspiration;
+    audio.bruit('onde');
+    annoncerArene('IL ASPIRE — RECULE !', 1.8);
+    return;
+  }
+  /* `!(x > 0)` et non `x <= 0` : `reposCharge` vaut `undefined` tant que
+     majKirby n'a pas tourne une premiere fois, et `undefined <= 0` est FAUX en
+     JavaScript. Ecrite dans l'autre sens, la condition interdisait la toute
+     premiere charge du combat. C'est le meme piege que `assomme` au niveau 9. */
+  if (ecart > 110 && !(b.reposCharge > 0) && tirage < 0.75) {
+    lancerChargeKirby(b);
+    return;
+  }
+  lancerMeule(b);
+  arene.repos = KIRBY.reposMin + Math.random() * (KIRBY.reposMax - KIRBY.reposMin);
+}
+
+function lancerChargeKirby(b) {
+  arene.phase = 'charge';
+  b.prepareT = KIRBY.preparationCharge;
+  b.reposCharge = KIRBY.reposCharge;
+  b.viseX = brad.x + brad.w / 2;
+  b.viseY = ARENE.sol;
+  audio.bruit('blinde');
+  texteFlottant(b.x + b.w / 2, b.y, 'il vise — bouge !', '#7ee0ff');
+}
+
+/* La meule de serrano. Elle roule au sol, saute par-dessus rien, et s'arrete
+   au mur. Un coup de poing la fait eclater : c'est la seule chose de ce combat
+   qui recompense l'attaque sans viser le boss. */
+function lancerMeule(b) {
+  const vers = Math.sign((brad.x + brad.w / 2) - (b.x + b.w / 2)) || 1;
+  arene.meules.push({
+    x: b.x + b.w / 2 + vers * 14,
+    y: ARENE.sol - 13,
+    vx: vers * KIRBY.vitesseMeule,
+    r: 13,
+    rot: 0,
+  });
+  b.sens = vers;
+  audio.bruit('coup');
+}
+
+function majMeules(dt) {
+  for (let i = arene.meules.length - 1; i >= 0; i--) {
+    const m = arene.meules[i];
+    m.x += m.vx * dt;
+    m.rot += (m.vx / m.r) * dt;
+
+    // Le mur de l'arene l'arrete.
+    if (m.x < ARENE.x1 + 8 || m.x > ARENE.x2 - 8) {
+      particules(m.x, m.y, 10, '#e8c98a');
+      arene.meules.splice(i, 1);
+      continue;
+    }
+
+    // Le coup de poing de Brad la fait eclater.
+    if (brad.attaque > 0) {
+      const z = zoneAttaque();
+      if (m.x > z.x - m.r && m.x < z.x + z.w + m.r &&
+          m.y > z.y - m.r && m.y < z.y + z.h + m.r) {
+        particules(m.x, m.y, 14, '#f0d98a');
+        audio.bruit('ecrase');
+        texteFlottant(m.x, m.y - 14, 'meule brisée', '#f0d98a');
+        arene.meules.splice(i, 1);
+        continue;
+      }
+    }
+
+    if (brad.invincible <= 0 && brad.scenarise <= 0 &&
+        Math.abs(m.x - (brad.x + brad.w / 2)) < m.r + brad.w / 2 &&
+        brad.y + brad.h > m.y - m.r && brad.y < m.y + m.r) {
+      blesserBrad(KIRBY.degatsMeule, m.x, 'meule de serrano');
+      particules(m.x, m.y, 10, '#e8c98a');
+      arene.meules.splice(i, 1);
+    }
+  }
+}
+
+function appelerLaGarde(b) {
+  arene.gardes++;
+  arene.phase = 'appel';
+  arene.tPhase = 1.5;
+  b.invincibleCourt = 1.5;
+  lancerRenforts(arene.gardes - 1);
+  secousse(6, 0.35);
+  annoncerArene('IL APPELLE SA GARDE', 2.4);
+}
+
+/* Le pilotage de Kirby 67 au manoir : il garde ses distances, sauf quand il
+   charge. Ecrit ici et non dans acteurs.js — comme celui du Seraphin — parce
+   que c'est de la mise en scene de combat, pas un comportement de type. */
+function majKirby(b, dt) {
+  b.reposCharge = Math.max(0, (b.reposCharge || 0) - dt);
+  b.invincibleCourt = Math.max(0, (b.invincibleCourt || 0) - dt);
+
+  const poser = () => {
+    b.vy = Math.min(R.chuteMax, b.vy + graviteCourante() * dt);
+    b.y += b.vy * dt;
+    if (b.y > ARENE.sol - b.h) { b.y = ARENE.sol - b.h; b.vy = 0; }
+  };
+
+  // --- L'elan de la charge : il se ramasse, la cible est deja fixee.
+  if (b.prepareT > 0) {
+    b.prepareT -= dt;
+    b.vx = 0;
+    poser();
+    if (b.prepareT <= 0) {
+      b.chargeT = 0.9;
+      audio.bruit('onde');
+    }
+    return;
+  }
+  if (b.chargeT > 0) {
+    b.chargeT -= dt;
+    const vers = Math.sign(b.viseX - (b.x + b.w / 2)) || b.sens;
+    b.vx = vers * KIRBY.vitesseCharge;
+    b.x += b.vx * dt;
+    b.sens = vers;
+    poser();
+    // Il ne blesse qu'en chargeant : c'est la regle `degatsAuContact: false`
+    // du type, et `chargeT` est la fenetre ou elle est levee.
+    if (Math.abs(b.viseX - (b.x + b.w / 2)) < 20) b.chargeT = 0;
+    return;
+  }
+
+  // --- L'aspiration : il est plante, bras ouverts.
+  if (arene.phase === 'aspire' || arene.phase === 'appel') {
+    b.vx = 0;
+    b.sens = Math.sign((brad.x + brad.w / 2) - (b.x + b.w / 2)) || b.sens;
+    poser();
+    return;
+  }
+
+  /* --- Sinon il MAINTIENT SA DISTANCE. Il ne fonce pas sur Brad — un boss qui
+     colle au joueur transforme un combat de rythme en bousculade, c'est le
+     defaut corrige sur le Seraphin. Il vise une distance de confort et s'y
+     tient, ce qui laisse au joueur le choix d'approcher ou non. */
+  const base = b.t.vitesse * vitesseEnnemiEffective();
+  const ecart = (brad.x + brad.w / 2) - (b.x + b.w / 2);
+  const distance = Math.abs(ecart);
+  const CONFORT = 150;
+  let cible = 0;
+  if (distance > CONFORT + 40) cible = Math.sign(ecart) * base;
+  else if (distance < CONFORT - 40) cible = -Math.sign(ecart) * base * 1.3;
+  b.vx = cible;
+  b.x += b.vx * dt;
+  if (Math.abs(ecart) > 4) b.sens = Math.sign(ecart);
+  poser();
+}
+
+/* Fin du premier combat. Le boss reste debout, la salle se vide, et la
+   cinematique prend la main — elle vit dans js/dialogue.js. */
+function terminerCombatManoir(b) {
+  arene.finie = true;
+  arene.active = false;
+  arene.meules.length = 0;
+  arene.phase = 'attente';
+  b.pv = Math.max(1, KIRBY.finCombat);
+  b.vx = 0;
+  b.prepareT = 0; b.chargeT = 0;
+
+  // Les gardes encore debout s'evanouissent : la scene qui suit doit etre a
+  // deux personnages, pas a sept.
+  for (let i = ennemis.length - 1; i >= 0; i--) {
+    if (ennemis[i] === b) continue;
+    particules(ennemis[i].x + 12, ennemis[i].y + 14, 6, '#e8c98a');
+    ennemis.splice(i, 1);
+  }
+  arene.sbires = [];
+
+  audio.arreterMusique(0.5);
+  secousse(10, 0.7);
+  if (typeof lancerFinDuManoir === 'function') lancerFinDuManoir();
+}
+
+/* Les meules, dessinees. Une roue de serrano vue de face : croute plus sombre,
+   pate claire, et une marque qui tourne pour qu'on voie qu'elle roule. */
+function dessinerMeules() {
+  if (!ARENE || !arene.meules.length) return;
+  for (const m of arene.meules) {
+    const x = Math.round(m.x - cam.x);
+    const y = Math.round(m.y - cam.y);
+    if (x < -40 || x > LARGEUR + 40) continue;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(m.rot);
+    ctx.fillStyle = '#8d6a34';
+    ctx.beginPath(); ctx.arc(0, 0, m.r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e8c98a';
+    ctx.beginPath(); ctx.arc(0, 0, m.r - 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c9a45c';
+    ctx.beginPath(); ctx.arc(-3, -3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, 2, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.fillRect(-m.r + 2, -1, m.r * 2 - 4, 2);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath();
+    ctx.ellipse(x, Math.round(ARENE.sol - cam.y), m.r * 0.8, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* Le souffle de l'aspiration : des traits qui convergent vers Kirby 67. Sans
+   image, l'effet ne se distinguerait pas d'un bug de deplacement. */
+function dessinerAspiration() {
+  if (!ARENE || ARENE.genre !== 'kirby' || arene.phase !== 'aspire') return;
+  const b = arene.boss;
+  if (!b) return;
+  const bx = Math.round(b.x + b.w / 2 - cam.x);
+  const by = Math.round(b.y + b.h * 0.4 - cam.y);
+  const t = performance.now() / 1000;
+  ctx.strokeStyle = 'rgba(150,230,255,.5)';
+  ctx.lineWidth = 2;
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * Math.PI * 2 + t * 1.4;
+    const d1 = 90 - ((t * 130 + k * 20) % 78);
+    const d2 = d1 + 20;
+    ctx.beginPath();
+    ctx.moveTo(bx + Math.cos(a) * d2, by + Math.sin(a) * d2 * 0.6);
+    ctx.lineTo(bx + Math.cos(a) * d1, by + Math.sin(a) * d1 * 0.6);
+    ctx.stroke();
+  }
+}
+
 /* Les positions de repos des copies. Toutes sont a portee d'un saut : une
    copie hors d'atteinte transformerait l'enigme en attente, et la mauvaise
    reponse serait alors la seule accessible. */
@@ -817,6 +1185,7 @@ const REPOS_PIQUE = 3.2;          // avant qu'il puisse recommencer
 function majPilote(e, dt, dx, dy) {
   if (e.t.pilotage === 'copie') return majCopie(e, dt);
   if (e.t.pilotage === 'balistique') return majBalistique(e, dt);
+  if (e.t.pilotage === 'kirby') return majKirby(e, dt);
   return majSeraphin(e, dt, dx, dy);
 }
 
@@ -932,7 +1301,12 @@ function dessinerVisee() {
   if (!b || b.prepareT <= 0 || b.viseX === undefined) return;
   const x = Math.round(b.viseX - cam.x);
   const sol = Math.round(ARENE.sol - cam.y);
-  const avance = 1 - b.prepareT / PREPARATION_PIQUE;   // 0 au debut, 1 a la fin
+  /* La duree de l'elan depend du boss : le Seraphin met 0,9 s a piquer, Kirby
+     67 met 0,85 s a charger. Le trait se resserre en fonction de l'echeance
+     REELLE — le figer sur une seule des deux valeurs ferait mentir le seul
+     repere temporel de l'esquive. */
+  const duree = ARENE.genre === 'kirby' ? KIRBY.preparationCharge : PREPARATION_PIQUE;
+  const avance = 1 - b.prepareT / duree;               // 0 au debut, 1 a la fin
   const t = performance.now() / 1000;
 
   // Le trait se resserre a mesure que l'echeance approche : la duree restante
@@ -1574,6 +1948,15 @@ function hudArene() {
        pendant un combat de boss. */
     const duplication = ARENE.genre === 'duplication';
     const lunaire = ARENE.genre === 'asteroides';
+    const manoir = ARENE.genre === 'kirby';
+    /* L'etat du combat du manoir se lit sur son GESTE en cours. C'est la seule
+       information utile : il n'a ni coque ni phase invulnerable durable, donc
+       la question n'est jamais « est-ce que mes coups portent » mais « qu'est-ce
+       qu'il est en train de faire ». */
+    const etatManoir = b.chargeT > 0 || b.prepareT > 0 ? ['IL CHARGE', '#ff9a7c']
+                     : arene.phase === 'aspire' ? ['IL ASPIRE', '#7ee0ff']
+                     : arene.phase === 'appel' ? ['IL APPELLE SA GARDE', '#e8c98a']
+                     : ['', '#e8b62c'];
     const etats = {
       geant: ['IL RÉSISTE', '#c8a0ff'],
       revelation: ['REGARDE BIEN', '#ffe9a8'],
@@ -1589,6 +1972,7 @@ function hudArene() {
                                    : ['SA COQUE TIENT', '#9ac4ff'];
     const couleur = duplication ? etat[1]
                   : lunaire ? etatLune[1]
+                  : manoir ? etatManoir[1]
                   : (arene.blinde ? '#78beff' : '#e8b62c');
 
     ctx.font = 'bold 10px system-ui, sans-serif';
@@ -1607,6 +1991,13 @@ function hudArene() {
       ctx.fillStyle = couleur;
       ctx.fillText(etatLune[0], x + l, y - 5);
       ctx.textAlign = 'left';
+    } else if (manoir) {
+      if (etatManoir[0]) {
+        ctx.textAlign = 'right';
+        ctx.fillStyle = couleur;
+        ctx.fillText(etatManoir[0], x + l, y - 5);
+        ctx.textAlign = 'left';
+      }
     } else if (arene.blinde) {
       ctx.textAlign = 'right';
       ctx.fillStyle = '#78beff';
@@ -1620,6 +2011,7 @@ function hudArene() {
     const f = Math.max(0, b.pv / b.pvMax);
     ctx.fillStyle = (duplication || lunaire)
       ? (b.assomme > 0 ? '#7ee08a' : (lunaire ? '#4f7bb8' : '#8b5fc0'))
+      : manoir ? '#3aa8bc'
       : (arene.blinde ? '#4a86c8' : '#d8483c');
     ctx.fillRect(x, y, Math.round(l * f), 7);
     // Reperes des seuils : le joueur voit venir la prochaine bascule.
@@ -1628,8 +2020,15 @@ function hudArene() {
        traits sur la barre annoncerait une bascule qui n'existe pas. */
     if (!lunaire) {
       ctx.fillStyle = 'rgba(9,11,20,.75)';
-      for (const s of (duplication ? SEUILS_DUPLICATION : SEUILS_BLINDAGE)) {
-        ctx.fillRect(x + Math.round(l * s), y, 2, 7);
+      const seuils = duplication ? SEUILS_DUPLICATION
+                   : manoir ? KIRBY.seuilsGarde
+                   : SEUILS_BLINDAGE;
+      for (const s of seuils) ctx.fillRect(x + Math.round(l * s), y, 2, 7);
+      /* La ligne d'arret du combat du manoir. Kirby 67 ne descend jamais plus
+         bas ; la montrer evite que le joueur croie sa barre bloquee. */
+      if (manoir) {
+        ctx.fillStyle = 'rgba(255,236,190,.85)';
+        ctx.fillRect(x + Math.round(l * (KIRBY.finCombat / b.pvMax)) - 1, y - 3, 2, 13);
       }
     }
     ctx.strokeStyle = 'rgba(255,255,255,.25)';

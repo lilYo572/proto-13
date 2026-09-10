@@ -299,6 +299,190 @@ function fondDialogue(nom) {
     return;
   }
 
+  /* -----------------------------------------------------------------------
+     LES FONDS DE L'ACTE FINAL
+
+     Cinq images, toutes en primitives comme les precedentes. Elles racontent
+     une suite : la grille du manoir, le trone brise, le manoir qui saute, la
+     faille ouverte sur le monde reel, et Lille sous la pluie. Chacune reprend
+     une couleur de la precedente pour que l'enchainement se lise comme un
+     mouvement et non comme cinq ecrans.
+  -------------------------------------------------------------------------- */
+
+  if (nom === 'grille-manoir') {
+    const g = ctx.createLinearGradient(0, 0, 0, HAUTEUR);
+    g.addColorStop(0, '#131a34'); g.addColorStop(1, '#4a4058');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    // La facade au fond, toutes fenetres allumees
+    ctx.fillStyle = '#241f36';
+    ctx.fillRect(96, 74, 448, 200);
+    ctx.beginPath();
+    ctx.moveTo(84, 74); ctx.lineTo(160, 34); ctx.lineTo(480, 34); ctx.lineTo(556, 74);
+    ctx.closePath(); ctx.fill();
+    for (let r = 0; r < 3; r++) {
+      for (let k = 0; k < 9; k++) {
+        ctx.fillStyle = 'rgba(255,214,140,' + (0.3 + 0.14 * Math.sin(t * 0.6 + k + r)).toFixed(2) + ')';
+        ctx.fillRect(118 + k * 48, 92 + r * 58, 22, 40);
+      }
+    }
+    // La grille en fer forge, au premier plan
+    ctx.fillStyle = '#0d1020';
+    ctx.fillRect(0, 250, LARGEUR, HAUTEUR - 250);
+    ctx.strokeStyle = 'rgba(226,180,90,.7)';
+    ctx.lineWidth = 3;
+    for (let k = 0; k < 22; k++) {
+      const x = 8 + k * 30;
+      ctx.beginPath(); ctx.moveTo(x, 300); ctx.lineTo(x, 150); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, 146, 4, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, 196); ctx.lineTo(LARGEUR, 196); ctx.stroke();
+    return;
+  }
+
+  if (nom === 'trone-brise') {
+    const g = ctx.createLinearGradient(0, 0, 0, HAUTEUR);
+    g.addColorStop(0, '#2c2030'); g.addColorStop(1, '#5a4144');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    // Les colonnes, penchees
+    for (let k = 0; k < 5; k++) {
+      const x = 40 + k * 140;
+      ctx.save();
+      ctx.translate(x, 300);
+      ctx.rotate((k % 2 ? 1 : -1) * 0.05);
+      ctx.fillStyle = 'rgba(246,238,220,.14)';
+      ctx.fillRect(-16, -250, 32, 250);
+      ctx.restore();
+    }
+    // Le trone renverse, au centre
+    ctx.save();
+    ctx.translate(LARGEUR / 2, 268);
+    ctx.rotate(0.3);
+    ctx.fillStyle = 'rgba(122,26,38,.75)';
+    ctx.fillRect(-40, -76, 80, 76);
+    ctx.fillStyle = 'rgba(226,180,90,.65)';
+    ctx.fillRect(-44, -82, 88, 8);
+    ctx.restore();
+    // Poussiere en suspension
+    ctx.fillStyle = 'rgba(255,236,190,.20)';
+    for (let k = 0; k < 40; k++) {
+      const px = (k * 137) % LARGEUR;
+      const py = 120 + ((k * 61 + t * 22) % 180);
+      ctx.fillRect(px, py, 2, 2);
+    }
+    ctx.fillStyle = '#241c22'; ctx.fillRect(0, 296, LARGEUR, HAUTEUR - 296);
+    return;
+  }
+
+  if (nom === 'manoir-explose') {
+    ctx.fillStyle = '#160d10'; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    // Le champignon de feu
+    const cx = LARGEUR / 2, cy = 210;
+    for (const [r, c] of [[190, 'rgba(120,40,20,.5)'], [140, 'rgba(206,86,32,.6)'],
+                          [96, 'rgba(240,150,50,.75)'], [54, 'rgba(255,226,150,.9)']]) {
+      const rr = r * (0.9 + 0.1 * Math.sin(t * 3 + r));
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    // Les debris qui montent
+    ctx.fillStyle = 'rgba(30,22,20,.9)';
+    for (let k = 0; k < 26; k++) {
+      const a = k * 0.72;
+      const d = 120 + ((k * 43 + t * 90) % 210);
+      ctx.save();
+      ctx.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.7 - 30);
+      ctx.rotate(a + t * 2);
+      ctx.fillRect(-5, -3, 10, 6);
+      ctx.restore();
+    }
+    // La silhouette du portail au loin, deja ouverte
+    ctx.strokeStyle = 'rgba(180,120,255,.65)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.ellipse(548, 150, 26, 52, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#100a0c'; ctx.fillRect(0, 300, LARGEUR, HAUTEUR - 300);
+    return;
+  }
+
+  if (nom === 'faille-lille') {
+    ctx.fillStyle = '#0a0714'; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    // La faille : une fente verticale qui s'ouvre sur un ciel gris
+    const l = 96 + 22 * Math.sin(t * 1.6);
+    const g = ctx.createLinearGradient(LARGEUR / 2 - l, 0, LARGEUR / 2 + l, 0);
+    g.addColorStop(0, 'rgba(150,80,240,0)');
+    g.addColorStop(0.35, 'rgba(150,80,240,.55)');
+    g.addColorStop(0.5, 'rgba(210,220,235,.95)');
+    g.addColorStop(0.65, 'rgba(150,80,240,.55)');
+    g.addColorStop(1, 'rgba(150,80,240,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(LARGEUR / 2, 10);
+    ctx.lineTo(LARGEUR / 2 + l, 180);
+    ctx.lineTo(LARGEUR / 2, 350);
+    ctx.lineTo(LARGEUR / 2 - l, 180);
+    ctx.closePath();
+    ctx.fill();
+    // Ce qu'on apercoit dedans : un beffroi et des toits de brique
+    ctx.fillStyle = 'rgba(88,54,48,.75)';
+    ctx.fillRect(LARGEUR / 2 - 14, 130, 28, 120);
+    ctx.beginPath();
+    ctx.moveTo(LARGEUR / 2 - 18, 130); ctx.lineTo(LARGEUR / 2, 96);
+    ctx.lineTo(LARGEUR / 2 + 18, 130); ctx.closePath(); ctx.fill();
+    // Des eclats violets qui tournent autour
+    ctx.fillStyle = 'rgba(190,140,255,.6)';
+    for (let k = 0; k < 14; k++) {
+      const a = k * 0.9 + t * 1.1;
+      const d = 130 + (k % 4) * 26;
+      ctx.fillRect(Math.round(LARGEUR / 2 + Math.cos(a) * d),
+                   Math.round(180 + Math.sin(a) * d * 0.55), 3, 3);
+    }
+    return;
+  }
+
+  if (nom === 'lille') {
+    const g = ctx.createLinearGradient(0, 0, 0, HAUTEUR);
+    g.addColorStop(0, '#3d4356'); g.addColorStop(1, '#8d8478');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
+    // La Grand-Place : facades a pignons, brique et pierre
+    for (let k = 0; k < 9; k++) {
+      const x = k * 74 - 20;
+      const h = 120 + ((k * 37) % 4) * 22;
+      ctx.fillStyle = k % 2 ? '#6d4a3e' : '#7d6350';
+      ctx.fillRect(x, 280 - h, 66, h + 40);
+      // Le pignon a redents, la signature du coin
+      ctx.beginPath();
+      for (let m = 0; m < 4; m++) {
+        ctx.rect(x + 8 + m * 6, 280 - h - 8 - m * 7, 50 - m * 12, 8 + m * 7);
+      }
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,226,170,.35)';
+      for (let r = 0; r < 3; r++) {
+        for (let c2 = 0; c2 < 3; c2++) {
+          ctx.fillRect(x + 10 + c2 * 18, 280 - h + 18 + r * 34, 11, 20);
+        }
+      }
+    }
+    // Le beffroi, plus haut que tout
+    ctx.fillStyle = '#5d4a44';
+    ctx.fillRect(430, 40, 46, 250);
+    ctx.beginPath();
+    ctx.moveTo(424, 40); ctx.lineTo(453, -8); ctx.lineTo(482, 40);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,226,170,.5)';
+    ctx.fillRect(444, 70, 18, 24);
+    // Le pave mouille, et la pluie
+    ctx.fillStyle = '#4a4740'; ctx.fillRect(0, 296, LARGEUR, HAUTEUR - 296);
+    ctx.fillStyle = 'rgba(255,255,255,.10)';
+    ctx.fillRect(0, 296, LARGEUR, 3);
+    ctx.strokeStyle = 'rgba(200,214,235,.35)';
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 70; k++) {
+      const px = (k * 173 + t * 190) % (LARGEUR + 60) - 30;
+      const py = (k * 97 + t * 460) % HAUTEUR;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - 3, py + 11); ctx.stroke();
+    }
+    return;
+  }
+
   ctx.fillStyle = '#0a0c14';
   ctx.fillRect(0, 0, LARGEUR, HAUTEUR);
 }
@@ -520,6 +704,94 @@ const DIALOGUE_FUSEE = [
     texte: 'Oui. J\'ai compris. J\'y vais.' },
 ];
 
+/* =============================================================================
+   L'ACTE FINAL — QUATRE CINEMATIQUES
+
+   Elles se suivent dans cet ordre, et chacune a un declencheur precis :
+
+     1. DIALOGUE_MANOIR    au lancement du niveau 10, une seule fois
+     2. DIALOGUE_EXPLOSION quand Kirby 67 tombe au manoir (js/boss.js)
+     3. DIALOGUE_PORTAIL   quand Brad accepte de franchir le portail de la base
+     4. DIALOGUE_FINAL     a l'ouverture du combat final (js/final.js)
+
+   Toutes sont courtes et passables. Une cinematique qu'on subit une seconde
+   fois est une cinematique de trop — c'est deja la regle de celle de la fusee.
+-------------------------------------------------------------------------- */
+
+const DIALOGUE_MANOIR = [
+  { qui: 'narrateur', fond: 'grille-manoir',
+    texte: 'Les trois pièces réunies, le BRADDY3000 a calculé une position. Elle tombait sur un manoir. Un vrai, avec une grille en fer forgé et un parc.' },
+  { qui: 'brad', fond: 'grille-manoir',
+    texte: 'Il vit ici ? Depuis le début ?' },
+  { qui: 'braddy', fond: 'grille-manoir',
+    texte: 'DEPUIS LE DÉBUT. Pendant que tu traversais une discothèque, une lune et un complexe nucléaire, il faisait tailler ses ifs.' },
+  { qui: 'brad', fond: 'grille-manoir',
+    texte: 'Toutes les fenêtres sont allumées.' },
+  { qui: 'braddy', fond: 'grille-manoir',
+    texte: 'IL T\'ATTEND. Sa garde aussi — ce sont des Serra, mais en livrée : plus de vie, plus de dégâts, et beaucoup moins d\'humour. Ne les prends pas de haut.' },
+  { qui: 'brad', fond: 'grille-manoir',
+    texte: 'Je ne prends jamais personne de haut. Je saute dessus, c\'est différent.' },
+];
+
+const DIALOGUE_EXPLOSION = [
+  { qui: 'narrateur', fond: 'trone-brise',
+    texte: 'Kirby 67 tombe à genoux au milieu de sa salle du trône. Le silence dure une seconde et demie.' },
+  { qui: 'kirby', fond: 'trone-brise',
+    texte: 'Bien. Vraiment. Tu es meilleur que la dernière fois.' },
+  { qui: 'brad', fond: 'trone-brise',
+    texte: 'Reste au sol.' },
+  { qui: 'kirby', fond: 'trone-brise',
+    texte: 'Non. Vois-tu, ce monde-ci, je l\'ai déjà fini. Il est au serrano d\'un bout à l\'autre. Ce qui m\'intéresse maintenant, c\'est le tien.' },
+  { qui: 'narrateur', fond: 'manoir-explose',
+    texte: 'Il claque des doigts. Le manoir saute. Quarante et une vitrines, deux cents mètres de tapis rouge et un jardin à la française partent en même temps.' },
+  { qui: 'braddy', fond: 'manoir-explose',
+    texte: 'BRAD. IL A OUVERT UNE FAILLE. Il ne fuit pas — il PASSE. De l\'autre côté, c\'est chez nous.' },
+  { qui: 'kirby', fond: 'faille-lille',
+    texte: 'Lille. Grand-Place. J\'y serai dans quatre minutes. Prends ton temps, surtout.' },
+  { qui: 'brad', fond: 'faille-lille',
+    texte: '…Pourquoi Lille ?' },
+  { qui: 'braddy', fond: 'faille-lille',
+    texte: 'PARCE QUE C\'EST LÀ QUE TU AS GRANDI, BRAD. Il ne choisit jamais une ville au hasard. Rentre à la base. Prends tout ce que tu peux prendre. Cette fois, il n\'y aura pas de suivante.' },
+];
+
+const DIALOGUE_PORTAIL = [
+  { qui: 'braddy', fond: 'faille-lille',
+    texte: 'PORTAIL STABLE. Je le tiens ouvert quatre-vingt-dix secondes, et je n\'aurai pas de deuxième essai.' },
+  { qui: 'brad', fond: 'faille-lille',
+    texte: 'Tu restes ici ?' },
+  { qui: 'braddy', fond: 'faille-lille',
+    texte: 'JE N\'AI PAS DE JAMBES, BRAD. Mais je te parle dans l\'oreille, et je compte. C\'est ce que je fais de mieux.' },
+  { qui: 'braddy', fond: 'lille',
+    texte: 'Une dernière chose. Là-bas, tes poings ne lui feront rien. RIEN. La seule chose qui l\'atteindra, c\'est ton Brad-Shy — concentré, chargé à bloc, tiré à bout portant.' },
+  { qui: 'brad', fond: 'lille',
+    texte: 'Et je le charge comment ?' },
+  { qui: 'braddy', fond: 'lille',
+    texte: 'COMME TOUJOURS : en tapant sur ce qui bouge. Il t\'enverra des Serra. Ce sont tes munitions. Trois décharges au but, et c\'est fini.' },
+  { qui: 'kirby', fond: 'lille',
+    texte: 'Tu as mis onze minutes. J\'ai eu le temps de visiter. C\'est charmant, chez toi.' },
+];
+
+const DIALOGUE_VICTOIRE = [
+  { qui: 'narrateur', fond: 'lille',
+    texte: 'La troisième décharge le prend de plein fouet. Kirby 67 recule de trois pas, regarde ses mains, et s\'assoit sur le pavé mouillé.' },
+  { qui: 'kirby', fond: 'lille',
+    texte: 'Bon. D\'accord. Celui-là, je te le laisse.' },
+  { qui: 'brad', fond: 'lille',
+    texte: 'Tu disais ça la dernière fois.' },
+  { qui: 'kirby', fond: 'lille',
+    texte: 'Oui. Mais cette fois je suis fatigué. Ce n\'est pas pareil.' },
+  { qui: 'braddy', fond: 'lille',
+    texte: 'LA FAILLE SE REFERME. Brad — nous avons un appareil à raclette, un poêlon, de la garniture, et plus personne à combattre.' },
+  { qui: 'brad', fond: 'lille',
+    texte: '…' },
+  { qui: 'brad', fond: 'lille',
+    texte: 'Alors on fait une raclette.' },
+  { qui: 'braddy', fond: 'lille',
+    texte: 'JE N\'AI PAS DE BOUCHE. Mais je tiendrai le tableau des parts. Personne ne me l\'a demandé.' },
+  { qui: 'narrateur', fond: 'lille',
+    texte: 'FIN. Enfin — fin de ce jeu-là. Il paraît qu\'il y en a un autre, avec des karts.' },
+];
+
 /* -----------------------------------------------------------------------------
    REPLIQUES DU BRADDY3000
 
@@ -565,6 +837,11 @@ const REPLIQUES_PAR_NIVEAU = {
     'J\'ai lu les écrans en passant. C\'était des tableurs. Des tableurs partout.',
     'Le tokamak pulse toutes les sept secondes. Je le sais parce que je n\'ai pas pu m\'en empêcher.',
     'Une chambre de confinement magnétique, dans un monde au Serrano. Quelqu\'un, là-bas, a de l\'ambition.',
+  ],
+  'niveau10': [
+    'Un manoir. Un vrai. Avec un parc. Pendant que tu traversais une lune.',
+    'Quarante et une vitrines de serrano. J\'ai compté pendant que ça explosait.',
+    'Il s\'est relevé. Ils se relèvent toujours. C\'est très agaçant.',
   ],
   'niveau9': [
     'Tu es allé sur la lune. Je tiens à le noter, parce que personne d\'autre ne le fera.',
@@ -667,6 +944,17 @@ function repliqueBraddy() {
     conseils.push('Un astéroïde ne touche que ce qui est près du sol. Sauter est une esquive — et il reste dessous.');
     conseils.push('Quand il est assommé, sa coque ne compte plus. Tu as trois secondes, pas quatre.');
   }
+  if (typeof niveauDebloque === 'function' && niveauDebloque('niveau10')) {
+    conseils.push('Sa garde est en livrée : trois fois la vie d\'un Serra ordinaire. Un saut sur la tête reste un saut sur la tête.');
+    conseils.push('Le Garde-Lourd ne s\'écrase pas. Contourne-le, ne le pousse pas.');
+    conseils.push('Kirby 67 garde ses distances et roule des meules. Une meule se brise d\'un coup de poing.');
+    conseils.push('Quand il claque des doigts, ne frappe pas : attends la fin du geste.');
+  }
+  if (partie.manoirFait && !partie.finalGagne) {
+    conseils.push('Le portail est au fond de la base. Il n\'y a pas de boutique de l\'autre côté — je le répète parce que c\'est important.');
+    conseils.push('Là-bas, tes poings ne lui feront rien. Seule l\'onde chargée à bloc compte, et de près.');
+    conseils.push('Ses Serra sont tes munitions. Ce n\'est pas une image : c\'est en les abattant que la jauge monte.');
+  }
 
   const absurdes = [
     'J\'ai rêvé cette nuit. Je ne dors pas, donc c\'est inquiétant.',
@@ -742,6 +1030,66 @@ function repliquesObjets() {
     'Poêlon, garniture, appareil. Il va sentir le fromage à des kilomètres. Il viendra. Il vient toujours.',
     'L\'appareil est complet. Le manoir nous attend. Prends une cravate propre.',
   ];
+}
+
+/* =============================================================================
+   L'ENCHAINEMENT DE L'ACTE FINAL
+
+   Quatre fonctions, une par charniere. Elles sont rassemblees ici plutot que
+   dispersees dans boss.js, hub.js et final.js parce que c'est un SCENARIO :
+   quand on veut savoir dans quel ordre les choses arrivent, on doit pouvoir le
+   lire d'un seul tenant.
+-------------------------------------------------------------------------- */
+
+/* 1. On part pour le manoir. Appele depuis la carte, une seule fois. */
+function lancerDepartManoir() {
+  partie.manoirVu = true;
+  enregistrerPartie();
+  audio.arreterMusique(0.6);
+  lancerDialogue(DIALOGUE_MANOIR, () => preparerNiveau('niveau10'));
+}
+
+/* 2. Kirby 67 tombe au manoir. Appele par js/boss.js quand sa vie descend sous
+      le seuil d'arret. Le niveau est valide ICI et pas a la porte : il n'y a
+      pas de porte a franchir, la cinematique la remplace. */
+function lancerFinDuManoir() {
+  if (partie.termines.indexOf('niveau10') < 0) partie.termines.push('niveau10');
+  partie.manoirFait = true;
+  enregistrerPartie();
+  lancerDialogue(DIALOGUE_EXPLOSION, () => {
+    entrerHub(false);
+    braddyDit('Le portail est monté, tout au fond de la base. Il tiendra le temps '
+            + 'qu\'il faudra — mais de l\'autre côté, il n\'y a ni boutique ni retour. '
+            + 'Dépense tout avant de passer.');
+  });
+}
+
+/* 3. Brad se presente devant le portail. La question du BRADDY3000 est le
+      dernier avertissement du jeu, et elle a un but precis : rappeler qu'il
+      reste peut-etre des Brad Coins a depenser. */
+function ouvrirPortailFinal() {
+  const reste = partie.pieces;
+  const rappel = reste >= 30
+    ? ' Il te reste ' + reste + ' Brad Coins. De l\'autre côté, ils ne valent plus rien.'
+    : '';
+  demanderConfirmation(
+    'ES-TU SÛR ? Le combat final commence maintenant. Pas de retour à la base, '
+    + 'pas de boutique là-bas.' + rappel,
+    () => {
+      audio.arreterMusique(0.6);
+      lancerDialogue(DIALOGUE_PORTAIL, () => demarrerCombatFinal(true));
+    });
+}
+
+/* 4. Kirby 67 est a terre pour de bon. */
+function terminerLeJeu() {
+  partie.finalGagne = true;
+  enregistrerPartie();
+  lancerDialogue(DIALOGUE_VICTOIRE, () => {
+    entrerHub(false);
+    braddyDit('Nous avons gagné, Brad. J\'ouvre un nouveau tableau. Celui-ci, '
+            + 'personne ne me l\'a demandé non plus.');
+  });
 }
 
 /* Ce qu'il dit au retour d'un niveau ou une piece vient d'etre ramassee : ça
